@@ -11,6 +11,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import ProtectedRoute from "./components/ProtectRoute";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
+import Teachers from "./pages/admin/Teachers";
+import Students from "./pages/admin/Student";
 
 export default function App() {
   return (
@@ -25,6 +27,8 @@ export default function App() {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route element={<AppLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/teachers" element={<Teachers />} />
+            <Route path="/admin/students" element={<Students />} />
           </Route>
         </Route>
 
