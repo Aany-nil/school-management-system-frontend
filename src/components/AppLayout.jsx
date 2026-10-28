@@ -167,7 +167,7 @@ export default function AppLayout() {
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-rose-600 hover:bg-rose-50"
+            className="mt-3 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-blue-700 hover:bg-blue-100"
           >
             <LogOut size={19} />
             Sign Out
@@ -228,7 +228,7 @@ export default function AppLayout() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-blue-700 hover:bg-blue-100"
                 >
                   <LogOut size={16} />
                   Sign Out
