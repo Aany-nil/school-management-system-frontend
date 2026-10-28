@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   GraduationCap,
@@ -24,32 +24,33 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import api from "../../services/api";
 
-const stats = [
+const statsConfig = [
   {
     title: "Total Students",
-    value: "1,240",
+    key: "totalStudents",
     note: "Registered students",
     icon: Users,
     color: "bg-blue-100 text-blue-700",
   },
   {
     title: "Total Teachers",
-    value: "68",
+    key: "totalTeachers",
     note: "Active teachers",
     icon: UserRound,
     color: "bg-violet-100 text-violet-700",
   },
   {
     title: "Total Classes",
-    value: "24",
+    key: "totalClasses",
     note: "Available classes",
     icon: School,
     color: "bg-emerald-100 text-emerald-700",
   },
   {
     title: "Total Subjects",
-    value: "36",
+    key: "totalSubjects",
     note: "Academic subjects",
     icon: BookOpen,
     color: "bg-amber-100 text-amber-700",
@@ -83,29 +84,110 @@ export default function AdminDashboard() {
   const [activeMenu, setActiveMenu] = useState("Dashboard");
   const [search, setSearch] = useState("");
 
+  const [dashboardData, setDashboardData] = useState({
+    overview: {
+      totalStudents: 0,
+      totalTeachers: 0,
+      totalClasses: 0,
+      totalSubjects: 0,
+      totalAttendance: 0,
+      totalResults: 0,
+      totalNotices: 0,
+    },
+    attendance: {
+      present: 0,
+      absent: 0,
+      late: 0,
+    },
+    recentNotices: [],
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await api.get("/dashboard/admin");
+
+        if (!response.data.success) {
+          throw new Error(
+            response.data.message || "Failed to load dashboard."
+          );
+        }
+
+        const data = response.data.data;
+
+        if (isMounted) {
+          setDashboardData({
+            overview: {
+              ...data.overview,
+            },
+            attendance: {
+              ...data.attendance,
+            },
+            recentNotices: Array.isArray(data.recentNotices)
+              ? data.recentNotices
+              : [],
+          });
+        }
+      } catch (err) {
+        console.error("Admin dashboard error:", err);
+
+        if (isMounted) {
+          setError(
+            err.response?.data?.error ||
+              err.response?.data?.message ||
+              err.message ||
+              "Dashboard data load korte problem hocche."
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchDashboard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     window.location.href = "/login";
   };
 
-  const notices = [
-    {
-      title: "Welcome to the School Management System",
-      date: "Recently published",
-      type: "General",
-    },
-    {
-      title: "Check the upcoming examination schedule",
-      date: "Academic notice",
-      type: "Academic",
-    },
-    {
-      title: "Please review attendance records",
-      date: "Administration",
-      type: "Reminder",
-    },
-  ];
+  const attendance = dashboardData.attendance;
+
+  const attendanceTotal =
+    attendance.present + attendance.absent + attendance.late;
+
+  const getPercentage = (value) => {
+    if (!attendanceTotal) return 0;
+
+    return Math.round((value / attendanceTotal) * 100);
+  };
+
+  const notices = dashboardData.recentNotices.map((notice) => ({
+    id: notice._id,
+    title: notice.title || "Untitled notice",
+    date: notice.publishDate || notice.createdAt
+      ? new Date(
+          notice.publishDate || notice.createdAt
+        ).toLocaleDateString()
+      : "Date unavailable",
+    type: notice.targetRole || "General",
+  }));
 
   const filteredNotices = notices.filter((notice) =>
     notice.title.toLowerCase().includes(search.toLowerCase())
@@ -129,13 +211,22 @@ export default function AdminDashboard() {
         } lg:translate-x-0`}
       >
         <div className="flex h-20 items-center justify-between border-b border-slate-100 px-5">
-          <Link to="/admin/dashboard" className="flex items-center gap-3">
+          <Link
+            to="/admin/dashboard"
+            onClick={() => setActiveMenu("Dashboard")}
+            className="flex items-center gap-3"
+          >
             <div className="rounded-xl bg-blue-600 p-2.5 text-white">
               <GraduationCap size={27} />
             </div>
+
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Education</h1>
-              <p className="text-xs text-slate-500">School Management</p>
+              <h1 className="text-lg font-bold text-slate-900">
+                Education
+              </h1>
+              <p className="text-xs text-slate-500">
+                School Management
+              </p>
             </div>
           </Link>
 
@@ -186,11 +277,14 @@ export default function AdminDashboard() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
               A
             </div>
+
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-800">
                 Administrator
               </p>
-              <p className="text-xs text-slate-500">Admin Account</p>
+              <p className="text-xs text-slate-500">
+                Admin Account
+              </p>
             </div>
           </div>
 
@@ -217,6 +311,7 @@ export default function AdminDashboard() {
             >
               <Menu size={21} />
             </button>
+
             <div>
               <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
                 Admin Dashboard
@@ -233,6 +328,7 @@ export default function AdminDashboard() {
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               />
+
               <input
                 type="search"
                 value={search}
@@ -244,11 +340,14 @@ export default function AdminDashboard() {
 
             <Link
               to="/admin/notices"
+              onClick={() => setActiveMenu("Notices")}
               aria-label="Notifications"
               className="relative rounded-xl border border-slate-200 p-2.5 text-slate-600 hover:bg-slate-50"
             >
               <Bell size={20} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" />
+              {dashboardData.overview.totalNotices > 0 && (
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" />
+              )}
             </Link>
 
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
@@ -258,6 +357,24 @@ export default function AdminDashboard() {
         </header>
 
         <div className="space-y-7 p-4 sm:p-7 lg:p-9">
+          {/* API error */}
+          {error && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              <p className="font-semibold">
+                Dashboard data load failed
+              </p>
+              <p className="mt-1">{error}</p>
+
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="mt-3 rounded-lg bg-rose-100 px-3 py-2 font-semibold hover:bg-rose-200"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
           {/* Welcome */}
           <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-600 p-6 text-white sm:p-8">
             <div className="absolute -right-12 -top-20 h-64 w-64 rounded-full bg-white/10" />
@@ -267,15 +384,19 @@ export default function AdminDashboard() {
               <p className="mb-2 text-sm font-medium text-blue-100">
                 SCHOOL ADMINISTRATION
               </p>
+
               <h3 className="text-2xl font-bold sm:text-3xl">
                 Welcome back, Admin!
               </h3>
+
               <p className="mt-3 max-w-xl text-sm leading-6 text-blue-100">
                 Manage students, teachers, classes, attendance, results and
                 other school activities from one place.
               </p>
+
               <Link
                 to="/admin/students"
+                onClick={() => setActiveMenu("Students")}
                 className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
               >
                 Manage School <ArrowUpRight size={17} />
@@ -294,14 +415,16 @@ export default function AdminDashboard() {
                   A quick look at your school statistics
                 </p>
               </div>
+
               <span className="rounded-lg bg-white px-3 py-2 text-xs font-medium text-slate-500 ring-1 ring-slate-200">
                 Overview
               </span>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((stat) => {
+              {statsConfig.map((stat) => {
                 const Icon = stat.icon;
+                const value = dashboardData.overview[stat.key] ?? 0;
 
                 return (
                   <div
@@ -314,13 +437,18 @@ export default function AdminDashboard() {
                       </div>
                       <TrendingUp size={18} className="text-emerald-500" />
                     </div>
+
                     <p className="mt-5 text-sm font-medium text-slate-500">
                       {stat.title}
                     </p>
+
                     <p className="mt-1 text-3xl font-bold text-slate-900">
-                      {stat.value}
+                      {loading ? "..." : value.toLocaleString()}
                     </p>
-                    <p className="mt-2 text-xs text-slate-400">{stat.note}</p>
+
+                    <p className="mt-2 text-xs text-slate-400">
+                      {stat.note}
+                    </p>
                   </div>
                 );
               })}
@@ -336,11 +464,13 @@ export default function AdminDashboard() {
                     Attendance Overview
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Example summary for the dashboard layout
+                    Attendance records from your school
                   </p>
                 </div>
+
                 <Link
                   to="/admin/attendance"
+                  onClick={() => setActiveMenu("Attendance")}
                   className="text-sm font-semibold text-blue-600 hover:text-blue-700"
                 >
                   View All
@@ -352,7 +482,10 @@ export default function AdminDashboard() {
                   <CheckCircle2 className="text-emerald-600" size={23} />
                   <p className="mt-3 text-sm text-emerald-700">Present</p>
                   <p className="mt-1 text-2xl font-bold text-emerald-800">
-                    86%
+                    {loading ? "..." : `${getPercentage(attendance.present)}%`}
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-600">
+                    {loading ? "Loading..." : `${attendance.present} records`}
                   </p>
                 </div>
 
@@ -360,7 +493,10 @@ export default function AdminDashboard() {
                   <AlertCircle className="text-rose-600" size={23} />
                   <p className="mt-3 text-sm text-rose-700">Absent</p>
                   <p className="mt-1 text-2xl font-bold text-rose-800">
-                    9%
+                    {loading ? "..." : `${getPercentage(attendance.absent)}%`}
+                  </p>
+                  <p className="mt-1 text-xs text-rose-600">
+                    {loading ? "Loading..." : `${attendance.absent} records`}
                   </p>
                 </div>
 
@@ -368,7 +504,10 @@ export default function AdminDashboard() {
                   <Clock className="text-amber-600" size={23} />
                   <p className="mt-3 text-sm text-amber-700">Late</p>
                   <p className="mt-1 text-2xl font-bold text-amber-800">
-                    5%
+                    {loading ? "..." : `${getPercentage(attendance.late)}%`}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-600">
+                    {loading ? "Loading..." : `${attendance.late} records`}
                   </p>
                 </div>
               </div>
@@ -376,27 +515,47 @@ export default function AdminDashboard() {
               <div className="mt-6 rounded-xl bg-slate-50 p-4">
                 <div className="mb-2 flex items-center justify-between text-sm">
                   <span className="font-medium text-slate-600">
-                    Attendance rate
+                    Present attendance rate
                   </span>
-                  <span className="font-bold text-slate-900">86%</span>
+                  <span className="font-bold text-slate-900">
+                    {loading ? "..." : `${getPercentage(attendance.present)}%`}
+                  </span>
                 </div>
+
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-full w-[86%] rounded-full bg-emerald-500" />
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{
+                      width: `${
+                        loading ? 0 : getPercentage(attendance.present)
+                      }%`,
+                    }}
+                  />
                 </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  {loading
+                    ? "Loading attendance..."
+                    : `${attendanceTotal} total attendance records`}
+                </p>
               </div>
             </div>
 
-            {/* Notices */}
+            {/* Recent Notices */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-bold text-slate-900">Recent Notices</h3>
+                  <h3 className="font-bold text-slate-900">
+                    Recent Notices
+                  </h3>
                   <p className="mt-1 text-sm text-slate-500">
                     Latest school updates
                   </p>
                 </div>
+
                 <Link
                   to="/admin/notices"
+                  onClick={() => setActiveMenu("Notices")}
                   aria-label="View notices"
                   className="rounded-lg bg-blue-50 p-2 text-blue-700 hover:bg-blue-100"
                 >
@@ -405,22 +564,29 @@ export default function AdminDashboard() {
               </div>
 
               <div className="mt-5 space-y-4">
-                {filteredNotices.length ? (
-                  filteredNotices.map((notice, index) => (
+                {loading ? (
+                  <p className="py-6 text-center text-sm text-slate-500">
+                    Loading notices...
+                  </p>
+                ) : filteredNotices.length > 0 ? (
+                  filteredNotices.map((notice) => (
                     <div
-                      key={notice.title}
+                      key={notice.id}
                       className="flex gap-3 border-b border-slate-100 pb-4 last:border-0 last:pb-0"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                         <Bell size={18} />
                       </div>
+
                       <div className="min-w-0">
                         <p className="text-sm font-semibold leading-5 text-slate-800">
                           {notice.title}
                         </p>
+
                         <p className="mt-1 text-xs text-slate-400">
                           {notice.date}
                         </p>
+
                         <span className="mt-2 inline-block rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
                           {notice.type}
                         </span>
@@ -429,14 +595,16 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <p className="py-6 text-center text-sm text-slate-500">
-                    No matching notices found.
+                    {search
+                      ? "No matching notices found."
+                      : "No notices available yet."}
                   </p>
                 )}
               </div>
             </div>
           </section>
 
-          {/* Quick actions */}
+          {/* Quick Actions */}
           <section>
             <div className="mb-4">
               <h3 className="text-lg font-bold text-slate-900">
@@ -455,11 +623,18 @@ export default function AdminDashboard() {
                   <Link
                     key={action.label}
                     to={action.path}
+                    onClick={() => {
+                      const menuItem = menuItems.find(
+                        (item) => item.path === action.path
+                      );
+                      if (menuItem) setActiveMenu(menuItem.label);
+                    }}
                     className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-md"
                   >
                     <div className="rounded-xl bg-blue-50 p-3 text-blue-700 transition group-hover:bg-blue-600 group-hover:text-white">
                       <Icon size={22} />
                     </div>
+
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-800">
                         {action.label}
@@ -468,6 +643,7 @@ export default function AdminDashboard() {
                         Open section
                       </p>
                     </div>
+
                     <ArrowUpRight
                       size={17}
                       className="text-slate-400 transition group-hover:text-blue-600"

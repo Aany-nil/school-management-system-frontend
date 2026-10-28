@@ -13,6 +13,7 @@ import ProtectedRoute from "./components/ProtectRoute";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import Teachers from "./pages/admin/Teachers";
 import Students from "./pages/admin/Student";
+import ClassManagement from "./pages/admin/Class";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/teachers" element={<Teachers />} />
             <Route path="/admin/students" element={<Students />} />
+            <Route path="/admin/classes" element={<ClassManagement />} />
           </Route>
         </Route>
 

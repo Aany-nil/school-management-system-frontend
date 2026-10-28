@@ -126,7 +126,7 @@ export default function Teachers() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Page heading */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
