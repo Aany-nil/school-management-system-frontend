@@ -479,7 +479,7 @@ export default function Salary() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[950px] text-left text-sm">
             <thead>
-              <tr className="border-b bg-gray-50 text-gray-600">
+              <tr className="bg-gray-50 text-gray-600">
                 <th className="px-4 py-3 font-semibold">Teacher</th>
                 <th className="px-4 py-3 font-semibold">Month</th>
                 <th className="px-4 py-3 font-semibold">Salary</th>

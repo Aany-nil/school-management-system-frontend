@@ -19,6 +19,8 @@ import AttendanceManagement from "./pages/admin/Attendance";
 import ResultManagement from "./pages/admin/Result";
 import Fees from "./pages/admin/Fee";
 import Salary from "./pages/admin/Salary";
+import Routine from "./pages/admin/Routine";
+import Notice from "./pages/admin/Notice";
 
 
 export default function App() {
@@ -42,6 +44,8 @@ export default function App() {
             <Route path="/admin/results" element={<ResultManagement />} />
             <Route path="/admin/fees" element={<Fees />} />
             <Route path="/admin/salaries" element={<Salary />} />
+            <Route path="/admin/routine" element={<Routine />} />
+            <Route path="/admin/notices" element={<Notice />} />
           </Route>
         </Route>
 
