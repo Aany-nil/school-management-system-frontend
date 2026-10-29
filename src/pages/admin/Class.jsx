@@ -252,7 +252,7 @@ export default function ClassManagement() {
         </div>
 
         <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="rounded-xl bg-violet-100 p-3 text-violet-700">
+          <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
             <Layers size={24} />
           </div>
           <div>
