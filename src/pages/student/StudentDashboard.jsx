@@ -31,11 +31,19 @@ export default function StudentDashboard() {
         const response = await api.get("/dashboard/student");
         const result = response.data;
 
-        setDashboard(result?.data ?? result);
+        if (!result?.success) {
+          throw new Error(
+            result?.message || "Dashboard data could not be loaded."
+          );
+        }
+
+        setDashboard(result.data || {});
       } catch (err) {
         console.error("Student dashboard error:", err);
+
         setError(
           err.response?.data?.message ||
+            err.message ||
             "Dashboard data could not be loaded. Please try again."
         );
       } finally {
@@ -54,13 +62,17 @@ export default function StudentDashboard() {
     }
   })();
 
-  const studentName = dashboard?.student?.name || user?.name || "Student";
+  const studentName =
+    dashboard?.profile?.name || user?.name || "Student";
 
   if (loading) {
     return (
       <div className="flex min-h-80 items-center justify-center">
         <div className="text-center">
-          <LoaderCircle className="mx-auto animate-spin text-blue-600" size={36} />
+          <LoaderCircle
+            className="mx-auto animate-spin text-blue-600"
+            size={36}
+          />
           <p className="mt-3 text-sm text-slate-500">
             Loading your dashboard...
           </p>
@@ -73,10 +85,13 @@ export default function StudentDashboard() {
     return (
       <div className="rounded-2xl border border-red-200 bg-white p-6">
         <AlertCircle className="mb-3 text-red-500" size={30} />
+
         <h2 className="font-bold text-slate-900">
           Unable to load dashboard
         </h2>
+
         <p className="mt-2 text-sm text-red-600">{error}</p>
+
         <button
           onClick={() => window.location.reload()}
           className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
@@ -87,18 +102,28 @@ export default function StudentDashboard() {
     );
   }
 
-  // These values depend on the response structure of your backend.
-  const attendance = dashboard?.attendance ?? {};
-  const results = dashboard?.results ?? [];
-  const fee = dashboard?.fee ?? {};
-  const notices = dashboard?.notices ?? [];
-  const routine = dashboard?.routine ?? [];
+  // Backend data
+  const attendance = dashboard?.attendance || {};
+  const results = dashboard?.results || [];
+  const fees = dashboard?.fees || {};
+  const notices = dashboard?.recentNotices || [];
+
+  // Attendance calculation
+  const present = Number(attendance.present || 0);
+  const absent = Number(attendance.absent || 0);
+  const late = Number(attendance.late || 0);
+
+  const totalAttendance = present + absent + late;
 
   const attendancePercentage =
-    attendance.percentage ??
-    (attendance.total > 0
-      ? Math.round((Number(attendance.present || 0) / attendance.total) * 100)
-      : 0);
+    totalAttendance > 0
+      ? Math.round((present / totalAttendance) * 100)
+      : 0;
+
+  // Fee calculation
+  const totalFee = Number(fees.totalFee || 0);
+  const paidFee = Number(fees.paidFee || 0);
+  const dueFee = Number(fees.dueFee || 0);
 
   const stats = [
     {
@@ -119,7 +144,7 @@ export default function StudentDashboard() {
     },
     {
       title: "Total Fees",
-      value: `৳${Number(fee.totalFee || 0).toLocaleString()}`,
+      value: `৳${totalFee.toLocaleString()}`,
       subtitle: "Your payable fees",
       icon: Wallet,
       color: "bg-amber-100 text-amber-700",
@@ -127,13 +152,7 @@ export default function StudentDashboard() {
     },
     {
       title: "Due Amount",
-      value: `৳${Number(
-        fee.dueAmount ??
-          Math.max(
-            0,
-            Number(fee.totalFee || 0) - Number(fee.paidAmount || 0)
-          )
-      ).toLocaleString()}`,
+      value: `৳${dueFee.toLocaleString()}`,
       subtitle: "Outstanding fees",
       icon: Wallet,
       color: "bg-rose-100 text-rose-700",
@@ -192,6 +211,7 @@ export default function StudentDashboard() {
           <h2 className="text-lg font-bold text-slate-900">
             Academic Overview
           </h2>
+
           <p className="mt-1 text-sm text-slate-500">
             Your academic information at a glance.
           </p>
@@ -212,9 +232,11 @@ export default function StudentDashboard() {
                     <p className="text-sm font-medium text-slate-500">
                       {stat.title}
                     </p>
+
                     <h3 className="mt-3 break-words text-2xl font-bold text-slate-900">
                       {stat.value}
                     </h3>
+
                     <p className="mt-2 text-xs text-slate-500">
                       {stat.subtitle}
                     </p>
@@ -238,10 +260,12 @@ export default function StudentDashboard() {
               <h2 className="font-bold text-slate-900">
                 Attendance Summary
               </h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 Your recorded attendance
               </p>
             </div>
+
             <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
               <CalendarCheck size={22} />
             </div>
@@ -249,27 +273,52 @@ export default function StudentDashboard() {
 
           <div className="mt-6 grid grid-cols-3 gap-3">
             <div className="rounded-xl bg-green-50 p-3 text-center">
-              <CheckCircle2 className="mx-auto text-green-600" size={21} />
+              <CheckCircle2
+                className="mx-auto text-green-600"
+                size={21}
+              />
+
               <p className="mt-2 text-xl font-bold text-green-700">
-                {attendance.present ?? 0}
+                {present}
               </p>
+
               <p className="text-xs text-slate-500">Present</p>
             </div>
 
             <div className="rounded-xl bg-red-50 p-3 text-center">
               <XCircle className="mx-auto text-red-600" size={21} />
+
               <p className="mt-2 text-xl font-bold text-red-700">
-                {attendance.absent ?? 0}
+                {absent}
               </p>
+
               <p className="text-xs text-slate-500">Absent</p>
             </div>
 
             <div className="rounded-xl bg-amber-50 p-3 text-center">
               <Clock className="mx-auto text-amber-600" size={21} />
+
               <p className="mt-2 text-xl font-bold text-amber-700">
-                {attendance.late ?? 0}
+                {late}
               </p>
+
               <p className="text-xs text-slate-500">Late</p>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-2 flex justify-between text-xs text-slate-500">
+              <span>Attendance Rate</span>
+              <span className="font-semibold text-blue-700">
+                {attendancePercentage}%
+              </span>
+            </div>
+
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all"
+                style={{ width: `${attendancePercentage}%` }}
+              />
             </div>
           </div>
 
@@ -281,14 +330,17 @@ export default function StudentDashboard() {
           </Link>
         </div>
 
+        {/* Fee Summary */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-slate-900">Fee Summary</h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 Your payment overview
               </p>
             </div>
+
             <div className="rounded-xl bg-amber-100 p-3 text-amber-700">
               <Wallet size={22} />
             </div>
@@ -297,15 +349,17 @@ export default function StudentDashboard() {
           <div className="mt-6 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-slate-500">Total Fees</span>
+
               <span className="font-semibold text-slate-900">
-                ৳{Number(fee.totalFee || 0).toLocaleString()}
+                ৳{totalFee.toLocaleString()}
               </span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm text-slate-500">Paid Amount</span>
+
               <span className="font-semibold text-green-700">
-                ৳{Number(fee.paidAmount || 0).toLocaleString()}
+                ৳{paidFee.toLocaleString()}
               </span>
             </div>
 
@@ -313,15 +367,9 @@ export default function StudentDashboard() {
               <span className="text-sm font-medium text-slate-600">
                 Due Amount
               </span>
+
               <span className="font-bold text-red-600">
-                ৳{Number(
-                  fee.dueAmount ??
-                    Math.max(
-                      0,
-                      Number(fee.totalFee || 0) -
-                        Number(fee.paidAmount || 0)
-                    )
-                ).toLocaleString()}
+                ৳{dueFee.toLocaleString()}
               </span>
             </div>
           </div>
@@ -337,14 +385,17 @@ export default function StudentDashboard() {
 
       {/* Results and routine */}
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Recent Results */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-slate-900">Recent Results</h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 Your latest academic results
               </p>
             </div>
+
             <ClipboardList className="text-violet-600" size={23} />
           </div>
 
@@ -357,11 +408,11 @@ export default function StudentDashboard() {
                 >
                   <div>
                     <p className="font-semibold text-slate-800">
-                      {result.subjectName ||
+                      {result.subjectId?.subjectName ||
                         result.subjectId?.name ||
-                        result.subject?.name ||
                         "Subject"}
                     </p>
+
                     <p className="mt-1 text-xs text-slate-500">
                       {result.examName || "Examination"}
                     </p>
@@ -371,6 +422,7 @@ export default function StudentDashboard() {
                     <p className="font-bold text-slate-900">
                       {result.marks ?? 0}/{result.totalMarks ?? 0}
                     </p>
+
                     <p className="text-xs font-semibold text-violet-700">
                       {result.grade || "—"}
                     </p>
@@ -380,7 +432,11 @@ export default function StudentDashboard() {
             </div>
           ) : (
             <div className="py-10 text-center">
-              <ClipboardList className="mx-auto text-slate-300" size={38} />
+              <ClipboardList
+                className="mx-auto text-slate-300"
+                size={38}
+              />
+
               <p className="mt-3 text-sm text-slate-500">
                 No results available yet.
               </p>
@@ -395,52 +451,27 @@ export default function StudentDashboard() {
           </Link>
         </div>
 
+        {/* My Routine */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-slate-900">My Routine</h2>
+
               <p className="mt-1 text-sm text-slate-500">
                 Your class schedule
               </p>
             </div>
+
             <BookOpen className="text-blue-600" size={23} />
           </div>
 
-          {routine.length > 0 ? (
-            <div className="mt-5 space-y-3">
-              {routine.slice(0, 5).map((item, index) => (
-                <div
-                  key={item._id || item.id || index}
-                  className="flex items-center gap-3 rounded-xl bg-slate-50 p-4"
-                >
-                  <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
-                    <Clock size={19} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-800">
-                      {item.subjectName ||
-                        item.subjectId?.name ||
-                        item.subject?.name ||
-                        "Class"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {item.day || item.dayOfWeek || "Scheduled class"}
-                    </p>
-                  </div>
-                  <span className="text-xs font-medium text-slate-600">
-                    {item.startTime || item.time || ""}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-10 text-center">
-              <BookOpen className="mx-auto text-slate-300" size={38} />
-              <p className="mt-3 text-sm text-slate-500">
-                No routine available yet.
-              </p>
-            </div>
-          )}
+          <div className="py-10 text-center">
+            <BookOpen className="mx-auto text-slate-300" size={38} />
+
+            <p className="mt-3 text-sm text-slate-500">
+              Routine information is not available in the current dashboard API.
+            </p>
+          </div>
 
           <Link
             to="/student/routine"
@@ -456,10 +487,12 @@ export default function StudentDashboard() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-bold text-slate-900">School Notices</h2>
+
             <p className="mt-1 text-sm text-slate-500">
               Latest announcements from your school
             </p>
           </div>
+
           <div className="rounded-xl bg-indigo-100 p-3 text-indigo-700">
             <Bell size={22} />
           </div>
@@ -475,13 +508,19 @@ export default function StudentDashboard() {
                 <div className="mt-1 rounded-lg bg-blue-50 p-2 text-blue-600">
                   <Bell size={17} />
                 </div>
+
                 <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-slate-800">
                     {getNoticeTitle(notice)}
                   </h3>
+
                   <p className="mt-1 text-sm leading-6 text-slate-500">
-                    {notice.message || notice.description || notice.content || ""}
+                    {notice.message ||
+                      notice.description ||
+                      notice.content ||
+                      ""}
                   </p>
+
                   <p className="mt-2 text-xs text-slate-400">
                     {getNoticeDate(notice)}
                   </p>
@@ -492,6 +531,7 @@ export default function StudentDashboard() {
         ) : (
           <div className="py-10 text-center">
             <Bell className="mx-auto text-slate-300" size={38} />
+
             <p className="mt-3 text-sm text-slate-500">
               There are no notices to display.
             </p>
@@ -501,4 +541,3 @@ export default function StudentDashboard() {
     </div>
   );
 }
-

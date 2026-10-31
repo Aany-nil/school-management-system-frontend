@@ -21,6 +21,12 @@ import Fees from "./pages/admin/Fee";
 import Salary from "./pages/admin/Salary";
 import Routine from "./pages/admin/Routine";
 import Notice from "./pages/admin/Notice";
+import SettingsManagement from "./pages/admin/Setting";
+import Attendance from "./pages/student/Attendance";
+import Result from "./pages/student/Result";
+import Fee from "./pages/student/Fee";
+import RoutineManagement from "./pages/student/Routine";
+import NoticeManagement from "./pages/student/Notice";
 
 
 export default function App() {
@@ -46,6 +52,7 @@ export default function App() {
             <Route path="/admin/salaries" element={<Salary />} />
             <Route path="/admin/routine" element={<Routine />} />
             <Route path="/admin/notices" element={<Notice />} />
+            <Route path="/admin/settings" element={<SettingsManagement />} />
           </Route>
         </Route>
 
@@ -53,6 +60,11 @@ export default function App() {
         <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
           <Route element={<AppLayout />}>
             <Route path="/student/dashboard" element={<StudentDashboard />}/>
+            <Route path="/student/attendance" element={<Attendance />} />
+            <Route path="/student/results" element={<Result />} />
+            <Route path="/student/fees" element={<Fee />} />
+            <Route path="/student/routine" element={<RoutineManagement />} />
+            <Route path="/student/notices" element={<NoticeManagement />} />
           </Route>
         </Route>
 
