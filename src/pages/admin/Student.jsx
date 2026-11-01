@@ -18,7 +18,7 @@ export default function Students() {
   const [error, setError] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
 
-  // Fetch registered students from the database
+  
   const fetchStudents = async () => {
     try {
       setLoading(true);
@@ -50,7 +50,7 @@ export default function Students() {
     fetchStudents();
   }, []);
 
-  // Search by student name or email
+
   const filteredStudents = students.filter((student) => {
     const name = student.name?.toLowerCase() || "";
     const email = student.email?.toLowerCase() || "";

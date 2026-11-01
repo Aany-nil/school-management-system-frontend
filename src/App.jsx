@@ -22,11 +22,14 @@ import Salary from "./pages/admin/Salary";
 import Routine from "./pages/admin/Routine";
 import Notice from "./pages/admin/Notice";
 import SettingsManagement from "./pages/admin/Setting";
+
+
 import Attendance from "./pages/student/Attendance";
 import Result from "./pages/student/Result";
 import Fee from "./pages/student/Fee";
 import RoutineManagement from "./pages/student/Routine";
 import NoticeManagement from "./pages/student/Notice";
+import StudentManagement from "./pages/teacher/Student";
 
 
 export default function App() {
@@ -73,6 +76,7 @@ export default function App() {
          <Route element={<ProtectedRoute allowedRoles={["teacher"]} />}>
           <Route element={<AppLayout />}>
             <Route path="/teacher/dashboard" element={<TeacherDashboard />}/>
+            <Route path="/teacher/students" element={<StudentManagement />} />
           </Route>
         </Route>
 
