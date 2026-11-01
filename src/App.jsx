@@ -31,6 +31,7 @@ import RoutineManagement from "./pages/student/Routine";
 import NoticeManagement from "./pages/student/Notice";
 import StudentManagement from "./pages/teacher/Student";
 import Class from "./pages/teacher/Class";
+import Subject from "./pages/teacher/Subject";
 
 
 export default function App() {
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="/teacher/dashboard" element={<TeacherDashboard />}/>
             <Route path="/teacher/students" element={<StudentManagement />} />
             <Route path="/teacher/classes" element={<Class />} />
+            <Route path="/teacher/subjects" element={<Subject />} />
           </Route>
         </Route>
 
