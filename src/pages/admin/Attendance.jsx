@@ -35,21 +35,33 @@ const getErrorMessage = (error) =>
 const getArray = (response) => {
   const body = response?.data;
 
-  // Supports common controller response structures.
   const candidates = [
     body?.data,
     body?.students,
     body?.classes,
     body?.attendance,
     body?.results,
+    body,
   ];
 
-  return candidates.find(Array.isArray) || [];
+  for (const item of candidates) {
+    if (Array.isArray(item)) return item;
+
+    if (item && typeof item === "object") {
+      const nested = Object.values(item).find(Array.isArray);
+      if (nested) return nested;
+    }
+  }
+
+  return [];
 };
 
 const getUser = () => {
   try {
-    return JSON.parse(localStorage.getItem("user") || "null");
+    return (
+      JSON.parse(localStorage.getItem("user") || "null") ||
+      JSON.parse(localStorage.getItem("tasmina_user") || "null")
+    );
   } catch {
     return null;
   }
@@ -109,10 +121,86 @@ export default function AttendanceManagement() {
 
   const currentUser = getUser();
   const role = String(currentUser?.role || "").toLowerCase();
+
   const isStudent = role === "student";
   const isAdmin = role === "admin";
-  const canManage = isAdmin || role === "teacher";
+  const isTeacher = role === "teacher";
 
+  // Admin: view and delete only.
+  // Teacher: create and update attendance.
+  // Student: view own attendance only.
+  const canCreate = isTeacher;
+  const canEdit = isTeacher;
+  const canDelete = isAdmin;
+
+  // Load classes according to user role.
+  const loadOptions = useCallback(async () => {
+    if (isStudent) {
+      setClasses([]);
+      setStudents([]);
+      return;
+    }
+
+    setOptionsLoading(true);
+    setError("");
+
+    try {
+      let response;
+
+      if (isAdmin) {
+        response = await api.get("/class/allclasses");
+      } else if (isTeacher) {
+        response = await api.get("/teacher/my-classes");
+      } else {
+        setClasses([]);
+        return;
+      }
+
+      const classList = getArray(response);
+      setClasses(classList);
+
+      if (isTeacher && filterClass) {
+        const stillAssigned = classList.some(
+          (item) => item._id === filterClass
+        );
+
+        if (!stillAssigned) {
+          setFilterClass("");
+        }
+      }
+    } catch (err) {
+      setError(`Could not load classes: ${getErrorMessage(err)}`);
+      setClasses([]);
+    } finally {
+      setOptionsLoading(false);
+    }
+  }, [isAdmin, isStudent, isTeacher, filterClass]);
+
+  // Load students only for the selected class.
+  const loadClassStudents = useCallback(async (classId) => {
+    if (!classId || !isTeacher) {
+      setStudents([]);
+      return;
+    }
+
+    setOptionsLoading(true);
+    setError("");
+
+    try {
+      const response = await api.get("/attendance/students", {
+        params: { classId },
+      });
+
+      setStudents(getArray(response));
+    } catch (err) {
+      setStudents([]);
+      setError(`Could not load students: ${getErrorMessage(err)}`);
+    } finally {
+      setOptionsLoading(false);
+    }
+  }, [isTeacher]);
+
+  // Load attendance according to role.
   const loadAttendance = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -133,38 +221,12 @@ export default function AttendanceManagement() {
 
       setAttendance(getArray(response));
     } catch (err) {
-      setError(getErrorMessage(err));
       setAttendance([]);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   }, [isStudent, filterClass, filterDate]);
-
-  const loadOptions = useCallback(async () => {
-    if (!canManage) {
-      setStudents([]);
-      setClasses([]);
-      return;
-    }
-
-    setOptionsLoading(true);
-
-    try {
-      const [studentResponse, classResponse] = await Promise.all([
-        api.get("/student/all-students"),
-        api.get("/class/allclasses"),
-      ]);
-
-      setStudents(getArray(studentResponse));
-      setClasses(getArray(classResponse));
-    } catch (err) {
-      setError(
-        `Could not load student/class options: ${getErrorMessage(err)}`
-      );
-    } finally {
-      setOptionsLoading(false);
-    }
-  }, [canManage]);
 
   useEffect(() => {
     loadOptions();
@@ -175,7 +237,10 @@ export default function AttendanceManagement() {
   }, [loadAttendance]);
 
   const openCreateModal = () => {
+    if (!canCreate) return;
+
     setEditingRecord(null);
+    setStudents([]);
     setForm(createInitialForm());
     setError("");
     setSuccess("");
@@ -183,6 +248,8 @@ export default function AttendanceManagement() {
   };
 
   const openEditModal = (record) => {
+    if (!canEdit) return;
+
     setEditingRecord(record);
 
     setForm({
@@ -203,21 +270,30 @@ export default function AttendanceManagement() {
 
     setModalOpen(false);
     setEditingRecord(null);
+    setStudents([]);
     setForm(createInitialForm());
     setError("");
   };
 
-  const handleChange = (event) => {
+  const handleChange = async (event) => {
     const { name, value } = event.target;
 
     setForm((previous) => ({
       ...previous,
       [name]: value,
+      ...(name === "classId" ? { student: "" } : {}),
     }));
+
+    if (name === "classId") {
+      await loadClassStudents(value);
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!canCreate && !canEdit) return;
+
     setError("");
     setSuccess("");
 
@@ -230,7 +306,7 @@ export default function AttendanceManagement() {
       !editingRecord &&
       (!form.student || !form.classId || !form.date)
     ) {
-      setError("Please select a student, class and date.");
+      setError("Please select a class, student and date.");
       return;
     }
 
@@ -258,6 +334,7 @@ export default function AttendanceManagement() {
 
       setModalOpen(false);
       setEditingRecord(null);
+      setStudents([]);
       setForm(createInitialForm());
 
       await loadAttendance();
@@ -269,6 +346,8 @@ export default function AttendanceManagement() {
   };
 
   const handleDelete = async (record) => {
+    if (!canDelete) return;
+
     const confirmed = window.confirm(
       "Are you sure you want to delete this attendance record?"
     );
@@ -280,6 +359,7 @@ export default function AttendanceManagement() {
 
     try {
       await api.delete(`/attendance/delete/${record._id}`);
+
       setSuccess("Attendance deleted successfully.");
       await loadAttendance();
     } catch (err) {
@@ -345,15 +425,19 @@ export default function AttendanceManagement() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-500">
-              Manage student attendance.
+              {isAdmin
+                ? "Monitor attendance records across all classes."
+                : isTeacher
+                  ? "Manage attendance for your assigned classes."
+                  : "View your attendance records."}
             </p>
           </div>
 
-          {canManage && (
+          {canCreate && (
             <button
               type="button"
               onClick={openCreateModal}
-              disabled={optionsLoading}
+              disabled={optionsLoading || classes.length === 0}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
             >
               {optionsLoading ? (
@@ -448,14 +532,16 @@ export default function AttendanceManagement() {
             />
           </div>
 
-          {canManage && (
+          {!isStudent && (
             <>
               <select
                 value={filterClass}
                 onChange={(event) => setFilterClass(event.target.value)}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
               >
-                <option value="">All Classes</option>
+                <option value="">
+                  {isAdmin ? "All Classes" : "All My Classes"}
+                </option>
 
                 {classes.map((item) => (
                   <option key={item._id} value={item._id}>
@@ -477,18 +563,16 @@ export default function AttendanceManagement() {
 
           <button
             type="button"
-            onClick={() => {
-              loadOptions();
-              loadAttendance();
+            onClick={async () => {
+              await loadOptions();
+              await loadAttendance();
             }}
             disabled={loading || optionsLoading}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
             <RefreshCw
               size={17}
-              className={
-                loading || optionsLoading ? "animate-spin" : ""
-              }
+              className={loading || optionsLoading ? "animate-spin" : ""}
             />
             Refresh
           </button>
@@ -500,6 +584,7 @@ export default function AttendanceManagement() {
             <h2 className="font-semibold text-slate-800">
               Attendance Records
             </h2>
+
             <p className="mt-1 text-xs text-slate-500">
               {filteredAttendance.length} records found
             </p>
@@ -516,9 +601,11 @@ export default function AttendanceManagement() {
           ) : filteredAttendance.length === 0 ? (
             <div className="flex min-h-52 flex-col items-center justify-center gap-3 px-5 text-center">
               <CalendarCheck size={34} className="text-slate-300" />
+
               <p className="font-medium text-slate-700">
                 No attendance records found
               </p>
+
               <p className="text-sm text-slate-500">
                 Try changing the filters or mark attendance for a student.
               </p>
@@ -531,11 +618,13 @@ export default function AttendanceManagement() {
                     {!isStudent && (
                       <th className="px-5 py-4 font-semibold">Student</th>
                     )}
+
                     <th className="px-5 py-4 font-semibold">Class</th>
                     <th className="px-5 py-4 font-semibold">Date</th>
                     <th className="px-5 py-4 font-semibold">Status</th>
                     <th className="px-5 py-4 font-semibold">Remarks</th>
-                    {canManage && (
+
+                    {(canEdit || canDelete) && (
                       <th className="px-5 py-4 text-right font-semibold">
                         Actions
                       </th>
@@ -551,6 +640,7 @@ export default function AttendanceManagement() {
                           <p className="font-medium text-slate-800">
                             {record.student?.name || "Unknown Student"}
                           </p>
+
                           <p className="mt-1 text-xs text-slate-500">
                             {record.student?.email || ""}
                           </p>
@@ -585,19 +675,21 @@ export default function AttendanceManagement() {
                         </span>
                       </td>
 
-                      {canManage && (
+                      {(canEdit || canDelete) && (
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(record)}
-                              title="Edit attendance"
-                              className="rounded-lg border border-blue-100 p-2 text-blue-600 hover:bg-blue-50"
-                            >
-                              <Pencil size={17} />
-                            </button>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(record)}
+                                title="Edit attendance"
+                                className="rounded-lg border border-blue-100 p-2 text-blue-600 hover:bg-blue-50"
+                              >
+                                <Pencil size={17} />
+                              </button>
+                            )}
 
-                            {isAdmin && (
+                            {canDelete && (
                               <button
                                 type="button"
                                 onClick={() => handleDelete(record)}
@@ -619,8 +711,8 @@ export default function AttendanceManagement() {
         </div>
       </div>
 
-      {/* Create / Edit modal */}
-      {modalOpen && (
+      {/* Teacher Create / Edit modal */}
+      {modalOpen && canCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
           <div
             role="dialog"
@@ -636,10 +728,11 @@ export default function AttendanceManagement() {
                 >
                   {editingRecord ? "Update Attendance" : "Mark Attendance"}
                 </h2>
+
                 <p className="mt-1 text-sm text-slate-500">
                   {editingRecord
                     ? "Change the status or remarks."
-                    : "Select a student, class, date and status."}
+                    : "Select your class, student, date and status."}
                 </p>
               </div>
 
@@ -668,44 +761,6 @@ export default function AttendanceManagement() {
                 <>
                   <div>
                     <label
-                      htmlFor="student"
-                      className="mb-2 block text-sm font-medium text-slate-700"
-                    >
-                      Student <span className="text-red-500">*</span>
-                    </label>
-
-                    <select
-                      id="student"
-                      name="student"
-                      value={form.student}
-                      onChange={handleChange}
-                      required
-                      disabled={optionsLoading}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                    >
-                      <option value="">
-                        {optionsLoading
-                          ? "Loading students..."
-                          : "Select student"}
-                      </option>
-
-                      {students.map((student) => (
-                        <option key={student._id} value={student._id}>
-                          {student.name}
-                          {student.email ? ` (${student.email})` : ""}
-                        </option>
-                      ))}
-                    </select>
-
-                    {!optionsLoading && students.length === 0 && (
-                      <p className="mt-2 text-xs text-amber-600">
-                        No students found. Check the student API response.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label
                       htmlFor="classId"
                       className="mb-2 block text-sm font-medium text-slate-700"
                     >
@@ -732,12 +787,48 @@ export default function AttendanceManagement() {
                         </option>
                       ))}
                     </select>
+                  </div>
 
-                    {!optionsLoading && classes.length === 0 && (
-                      <p className="mt-2 text-xs text-amber-600">
-                        No classes found. Please check Class Management.
-                      </p>
-                    )}
+                  <div>
+                    <label
+                      htmlFor="student"
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
+                      Student <span className="text-red-500">*</span>
+                    </label>
+
+                    <select
+                      id="student"
+                      name="student"
+                      value={form.student}
+                      onChange={handleChange}
+                      required
+                      disabled={!form.classId || optionsLoading}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
+                    >
+                      <option value="">
+                        {!form.classId
+                          ? "Select a class first"
+                          : optionsLoading
+                            ? "Loading students..."
+                            : "Select student"}
+                      </option>
+
+                      {students.map((student) => (
+                        <option key={student._id} value={student._id}>
+                          {student.name}
+                          {student.email ? ` (${student.email})` : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    {form.classId &&
+                      !optionsLoading &&
+                      students.length === 0 && (
+                        <p className="mt-2 text-xs text-amber-600">
+                          No students found in this class.
+                        </p>
+                      )}
                   </div>
 
                   <div>
@@ -818,7 +909,9 @@ export default function AttendanceManagement() {
                     saving ||
                     optionsLoading ||
                     (!editingRecord &&
-                      (!students.length || !classes.length))
+                      (!form.classId ||
+                        !form.student ||
+                        !students.length))
                   }
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >

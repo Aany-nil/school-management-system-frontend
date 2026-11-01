@@ -33,6 +33,7 @@ import StudentManagement from "./pages/teacher/Student";
 import Class from "./pages/teacher/Class";
 import Subject from "./pages/teacher/Subject";
 import PresentManagement from "./pages/teacher/Attendance";
+import ResultsManagement from "./pages/teacher/Result";
 
 
 export default function App() {
@@ -83,6 +84,7 @@ export default function App() {
             <Route path="/teacher/classes" element={<Class />} />
             <Route path="/teacher/subjects" element={<Subject />} />
             <Route path="/teacher/attendance" element={<PresentManagement />} />
+            <Route path="/teacher/results" element={<ResultsManagement />} />
           </Route>
         </Route>
 
