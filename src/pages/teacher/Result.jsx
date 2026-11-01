@@ -70,7 +70,7 @@ export default function ResultsManagement() {
     }
   });
 
-  // Load teacher classes, subjects and students.
+  
   const loadData = async () => {
     setLoading(true);
     setError("");
