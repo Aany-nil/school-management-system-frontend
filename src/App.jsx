@@ -30,6 +30,7 @@ import Fee from "./pages/student/Fee";
 import RoutineManagement from "./pages/student/Routine";
 import NoticeManagement from "./pages/student/Notice";
 import StudentManagement from "./pages/teacher/Student";
+import Class from "./pages/teacher/Class";
 
 
 export default function App() {
@@ -77,6 +78,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/teacher/dashboard" element={<TeacherDashboard />}/>
             <Route path="/teacher/students" element={<StudentManagement />} />
+            <Route path="/teacher/classes" element={<Class />} />
           </Route>
         </Route>
 
