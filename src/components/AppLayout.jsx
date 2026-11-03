@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   ChevronDown,
+  UserCircle,
 } from "lucide-react";
 
 const navigation = {
@@ -34,7 +35,9 @@ const navigation = {
     { label: "Routine", path: "/admin/routine", icon: CalendarCheck },
     { label: "Notices", path: "/admin/notices", icon: Bell },
     { label: "Settings", path: "/admin/settings", icon: Settings },
+    { label: "My Profile", path: "/admin/profile", icon: UserCircle },
   ],
+
   teacher: [
     { label: "Dashboard", path: "/teacher/dashboard", icon: LayoutDashboard },
     { label: "Students", path: "/teacher/students", icon: Users },
@@ -44,7 +47,9 @@ const navigation = {
     { label: "Results", path: "/teacher/results", icon: ClipboardList },
     { label: "Routine", path: "/teacher/routine", icon: CalendarCheck },
     { label: "Notices", path: "/teacher/notices", icon: Bell },
+    { label: "My Profile", path: "/teacher/profile", icon: UserCircle },
   ],
+
   student: [
     { label: "Dashboard", path: "/student/dashboard", icon: LayoutDashboard },
     { label: "My Attendance", path: "/student/attendance", icon: CalendarCheck },
@@ -52,12 +57,14 @@ const navigation = {
     { label: "My Fees", path: "/student/fees", icon: Wallet },
     { label: "My Routine", path: "/student/routine", icon: BookOpen },
     { label: "Notices", path: "/student/notices", icon: Bell },
+    { label: "My Profile", path: "/student/profile", icon: UserCircle },
   ],
 };
 
 export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
   const navigate = useNavigate();
 
   let user = null;
@@ -70,10 +77,14 @@ export default function AppLayout() {
 
   const role = user?.role;
   const items = navigation[role] || [];
+
   const displayName = user?.name || "User";
+
   const displayRole = role
     ? role.charAt(0).toUpperCase() + role.slice(1)
     : "Account";
+
+  const profilePath = role ? `/${role}/profile` : "/login";
 
   const handleLogout = () => {
     setProfileOpen(false);
@@ -82,8 +93,15 @@ export default function AppLayout() {
     navigate("/login", { replace: true });
   };
 
+  const handleProfileClick = () => {
+    setProfileOpen(false);
+    navigate(profilePath);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
+
+      {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <button
           type="button"
@@ -93,11 +111,13 @@ export default function AppLayout() {
         />
       )}
 
+      {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
+        {/* Logo */}
         <div className="flex h-20 items-center justify-between border-b border-slate-100 px-5">
           <Link
             to={navigation[role]?.[0]?.path || "/login"}
@@ -106,9 +126,12 @@ export default function AppLayout() {
             <div className="rounded-xl bg-blue-600 p-2.5 text-white">
               <GraduationCap size={26} />
             </div>
+
             <div>
               <h1 className="font-bold text-slate-900">Education</h1>
-              <p className="text-xs text-slate-500">School Management</p>
+              <p className="text-xs text-slate-500">
+                School Management
+              </p>
             </div>
           </Link>
 
@@ -122,12 +145,14 @@ export default function AppLayout() {
           </button>
         </div>
 
+        {/* Menu Title */}
         <div className="px-4 pb-2 pt-6">
           <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
             {displayRole} Menu
           </p>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
           {items.map((item) => {
             const Icon = item.icon;
@@ -153,14 +178,21 @@ export default function AppLayout() {
           })}
         </nav>
 
+        {/* Sidebar User Info */}
         <div className="border-t border-slate-100 p-4">
           <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
               {displayName.charAt(0).toUpperCase()}
             </div>
+
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{displayName}</p>
-              <p className="text-xs text-slate-500">{displayRole}</p>
+              <p className="truncate text-sm font-semibold">
+                {displayName}
+              </p>
+
+              <p className="text-xs text-slate-500">
+                {displayRole}
+              </p>
             </div>
           </div>
 
@@ -175,8 +207,13 @@ export default function AppLayout() {
         </div>
       </aside>
 
+      {/* Main Content */}
       <div className="min-h-screen lg:ml-64">
+
+        {/* Header */}
         <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-7">
+
+          {/* Left Header */}
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -191,13 +228,14 @@ export default function AppLayout() {
               <h2 className="text-lg font-bold text-slate-900">
                 {displayRole} Panel
               </h2>
+
               <p className="hidden text-xs text-slate-500 sm:block">
                 School Management System
               </p>
             </div>
           </div>
 
-          {/* Profile dropdown */}
+          {/* Profile Dropdown */}
           <div className="relative z-50">
             <button
               type="button"
@@ -218,13 +256,28 @@ export default function AppLayout() {
 
             {profileOpen && (
               <div className="absolute right-0 top-full z-[100] mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+
                 <div className="border-b border-slate-100 px-3 py-3">
                   <p className="truncate text-sm font-semibold text-slate-900">
                     {displayName}
                   </p>
-                  <p className="text-xs text-slate-500">{displayRole}</p>
+
+                  <p className="text-xs text-slate-500">
+                    {displayRole}
+                  </p>
                 </div>
 
+                {/* My Profile */}
+                <button
+                  type="button"
+                  onClick={handleProfileClick}
+                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  <UserCircle size={17} />
+                  My Profile
+                </button>
+
+                {/* Logout */}
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -238,6 +291,7 @@ export default function AppLayout() {
           </div>
         </header>
 
+        {/* Page Content */}
         <main className="p-4 sm:p-7 lg:p-9">
           <Outlet />
         </main>

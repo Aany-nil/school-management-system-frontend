@@ -36,6 +36,9 @@ import PresentManagement from "./pages/teacher/Attendance";
 import ResultsManagement from "./pages/teacher/Result";
 import RoutineSystem from "./pages/teacher/Routine";
 import NoticeList from "./pages/teacher/Notice";
+import Profile from "./pages/admin/Profile";
+import TeacherProfile from "./pages/teacher/Profile";
+import StudentProfile from "./pages/student/Profile";
 
 
 export default function App() {
@@ -62,6 +65,7 @@ export default function App() {
             <Route path="/admin/routine" element={<Routine />} />
             <Route path="/admin/notices" element={<Notice />} />
             <Route path="/admin/settings" element={<SettingsManagement />} />
+            <Route path="/admin/profile" element={<Profile />} />
           </Route>
         </Route>
 
@@ -74,6 +78,7 @@ export default function App() {
             <Route path="/student/fees" element={<Fee />} />
             <Route path="/student/routine" element={<RoutineManagement />} />
             <Route path="/student/notices" element={<NoticeManagement />} />
+            <Route path="/student/profile" element={<StudentProfile />} />
           </Route>
         </Route>
 
@@ -89,6 +94,7 @@ export default function App() {
             <Route path="/teacher/results" element={<ResultsManagement />} />
             <Route path="/teacher/routine" element={<RoutineSystem />} />
             <Route path="/teacher/notices" element={<NoticeList />} />
+            <Route path="/teacher/profile" element={<TeacherProfile />} />
           </Route>
         </Route>
 
