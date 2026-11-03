@@ -35,6 +35,7 @@ import Subject from "./pages/teacher/Subject";
 import PresentManagement from "./pages/teacher/Attendance";
 import ResultsManagement from "./pages/teacher/Result";
 import RoutineSystem from "./pages/teacher/Routine";
+import NoticeList from "./pages/teacher/Notice";
 
 
 export default function App() {
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/teacher/attendance" element={<PresentManagement />} />
             <Route path="/teacher/results" element={<ResultsManagement />} />
             <Route path="/teacher/routine" element={<RoutineSystem />} />
+            <Route path="/teacher/notices" element={<NoticeList />} />
           </Route>
         </Route>
 

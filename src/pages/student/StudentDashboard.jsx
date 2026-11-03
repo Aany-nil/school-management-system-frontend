@@ -15,13 +15,18 @@ import {
   AlertCircle,
   LoaderCircle,
 } from "lucide-react";
+
 import api from "../../services/api";
 
 export default function StudentDashboard() {
   const [dashboard, setDashboard] = useState(null);
+  const [routines, setRoutines] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  const [routineLoading, setRoutineLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Fetch Dashboard Data
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
@@ -54,6 +59,35 @@ export default function StudentDashboard() {
     fetchDashboard();
   }, []);
 
+  // Fetch Only Logged-in Student's Routine
+  useEffect(() => {
+    const fetchStudentRoutine = async () => {
+      try {
+        setRoutineLoading(true);
+
+        const response = await api.get("/routine/all");
+
+        const routineData = response.data?.data;
+
+        setRoutines(
+          Array.isArray(routineData) ? routineData : []
+        );
+      } catch (err) {
+        console.error(
+          "Student routine loading error:",
+          err.response?.data || err.message
+        );
+
+        setRoutines([]);
+      } finally {
+        setRoutineLoading(false);
+      }
+    };
+
+    fetchStudentRoutine();
+  }, []);
+
+  // Logged-in User
   const user = (() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "null");
@@ -102,13 +136,17 @@ export default function StudentDashboard() {
     );
   }
 
-  // Backend data
+  // Backend Data
   const attendance = dashboard?.attendance || {};
-  const results = dashboard?.results || [];
+  const results = Array.isArray(dashboard?.results)
+    ? dashboard.results
+    : [];
   const fees = dashboard?.fees || {};
-  const notices = dashboard?.recentNotices || [];
+  const notices = Array.isArray(dashboard?.recentNotices)
+    ? dashboard.recentNotices
+    : [];
 
-  // Attendance calculation
+  // Attendance Calculation
   const present = Number(attendance.present || 0);
   const absent = Number(attendance.absent || 0);
   const late = Number(attendance.late || 0);
@@ -120,11 +158,12 @@ export default function StudentDashboard() {
       ? Math.round((present / totalAttendance) * 100)
       : 0;
 
-  // Fee calculation
+  // Fee Calculation
   const totalFee = Number(fees.totalFee || 0);
   const paidFee = Number(fees.paidFee || 0);
   const dueFee = Number(fees.dueFee || 0);
 
+  // Dashboard Statistics
   const stats = [
     {
       title: "Attendance",
@@ -160,6 +199,7 @@ export default function StudentDashboard() {
     },
   ];
 
+  // Notice Helpers
   const getNoticeTitle = (notice) =>
     notice.title || notice.noticeTitle || "School Notice";
 
@@ -177,7 +217,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome section */}
+      {/* Welcome Section */}
       <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 to-indigo-600 p-6 text-white shadow-lg sm:p-8">
         <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/10" />
         <div className="absolute -bottom-20 right-40 h-48 w-48 rounded-full bg-white/5" />
@@ -252,8 +292,9 @@ export default function StudentDashboard() {
         </div>
       </section>
 
-      {/* Attendance and fees */}
+      {/* Attendance and Fees */}
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* Attendance Summary */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -309,6 +350,7 @@ export default function StudentDashboard() {
           <div className="mt-5">
             <div className="mb-2 flex justify-between text-xs text-slate-500">
               <span>Attendance Rate</span>
+
               <span className="font-semibold text-blue-700">
                 {attendancePercentage}%
               </span>
@@ -383,7 +425,7 @@ export default function StudentDashboard() {
         </div>
       </section>
 
-      {/* Results and routine */}
+      {/* Results and Routine */}
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         {/* Recent Results */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -458,31 +500,84 @@ export default function StudentDashboard() {
               <h2 className="font-bold text-slate-900">My Routine</h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Your class schedule
+                Your assigned class schedule
               </p>
             </div>
 
             <BookOpen className="text-blue-600" size={23} />
           </div>
 
-          <div className="py-10 text-center">
-            <BookOpen className="mx-auto text-slate-300" size={38} />
+          {routineLoading ? (
+            <div className="py-10 text-center">
+              <LoaderCircle
+                className="mx-auto animate-spin text-blue-600"
+                size={30}
+              />
 
-            <p className="mt-3 text-sm text-slate-500">
-              Routine information is not available in the current dashboard API.
-            </p>
-          </div>
+              <p className="mt-2 text-sm text-slate-500">
+                Loading routine...
+              </p>
+            </div>
+          ) : routines.length > 0 ? (
+            <div className="mt-5 space-y-3">
+              {routines.slice(0, 4).map((routine) => (
+                <div
+                  key={routine._id}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-800">
+                      {routine.subjectId?.subjectName || "Subject"}
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {routine.teacherId?.name || "Teacher"}
+                    </p>
+
+                    <p className="mt-1 text-xs font-medium capitalize text-blue-600">
+                      {routine.day}
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-semibold text-slate-700">
+                      {routine.startTime}
+                    </p>
+
+                    <p className="text-xs text-slate-500">
+                      to {routine.endTime}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-10 text-center">
+              <BookOpen
+                className="mx-auto text-slate-300"
+                size={38}
+              />
+
+              <p className="mt-3 text-sm text-slate-500">
+                No routine available for your class yet.
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                Please contact Admin if your class has not been assigned.
+              </p>
+            </div>
+          )}
 
           <Link
             to="/student/routine"
-            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
           >
             View full routine <ArrowRight size={16} />
           </Link>
         </div>
       </section>
 
-      {/* Notices */}
+      {/* School Notices */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>

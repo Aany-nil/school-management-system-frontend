@@ -35,13 +35,17 @@ const RoutineManagement = () => {
       setLoading(true);
       setError("");
 
+      // Backend returns only the logged-in student's class routines
       const response = await api.get("/routine/all");
 
-      setRoutines(response.data?.data || []);
+      const routineData = response.data?.data;
+
+      setRoutines(Array.isArray(routineData) ? routineData : []);
     } catch (err) {
       setError(
         err.response?.data?.message || "Failed to load routine."
       );
+      setRoutines([]);
     } finally {
       setLoading(false);
     }
@@ -51,8 +55,16 @@ const RoutineManagement = () => {
     fetchRoutines();
   }, []);
 
-  const formatDay = (day) =>
-    day.charAt(0).toUpperCase() + day.slice(1);
+  const normalizeDay = (day) =>
+    String(day || "").trim().toLowerCase();
+
+  const formatDay = (day) => {
+    const normalized = normalizeDay(day);
+
+    if (!normalized) return "N/A";
+
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
 
   const filteredRoutines = routines.filter((routine) => {
     const searchText = search.toLowerCase();
@@ -60,26 +72,42 @@ const RoutineManagement = () => {
     const className = routine.classId?.className || "";
     const section = routine.classId?.section || "";
     const subject = routine.subjectId?.subjectName || "";
+    const subjectCode = routine.subjectId?.subjectCode || "";
     const teacher = routine.teacherId?.name || "";
 
-    const matchesSearch =
-      className.toLowerCase().includes(searchText) ||
-      section.toLowerCase().includes(searchText) ||
-      subject.toLowerCase().includes(searchText) ||
-      teacher.toLowerCase().includes(searchText);
+    const matchesSearch = [
+      className,
+      section,
+      subject,
+      subjectCode,
+      teacher,
+    ].some((value) =>
+      String(value).toLowerCase().includes(searchText)
+    );
 
     const matchesDay =
-      selectedDay === "all" || routine.day === selectedDay;
+      selectedDay === "all" ||
+      normalizeDay(routine.day) === selectedDay;
 
     return matchesSearch && matchesDay;
   });
 
+  const totalClasses = new Set(
+    routines
+      .map((item) => item.classId?._id)
+      .filter(Boolean)
+  ).size;
+
   const totalSubjects = new Set(
-    routines.map((item) => item.subjectId?._id).filter(Boolean)
+    routines
+      .map((item) => item.subjectId?._id)
+      .filter(Boolean)
   ).size;
 
   const totalTeachers = new Set(
-    routines.map((item) => item.teacherId?._id).filter(Boolean)
+    routines
+      .map((item) => item.teacherId?._id)
+      .filter(Boolean)
   ).size;
 
   return (
@@ -93,27 +121,32 @@ const RoutineManagement = () => {
           </h1>
 
           <p className="mt-1 text-sm text-gray-500">
-            View your weekly class schedule.
+            View your assigned class weekly schedule.
           </p>
         </div>
 
         <button
           onClick={fetchRoutines}
-          className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+          disabled={loading}
+          className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-60"
         >
-          <RefreshCw size={17} />
+          <RefreshCw
+            size={17}
+            className={loading ? "animate-spin" : ""}
+          />
           Refresh
         </button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Classes</p>
+              <p className="text-sm text-gray-500">My Class</p>
               <h2 className="mt-2 text-3xl font-bold text-gray-800">
-                {routines.length}
+                {totalClasses}
               </h2>
             </div>
 
@@ -152,6 +185,7 @@ const RoutineManagement = () => {
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Day Filter */}
@@ -161,6 +195,7 @@ const RoutineManagement = () => {
         </h2>
 
         <div className="flex gap-2 overflow-x-auto pb-2">
+
           <button
             onClick={() => setSelectedDay("all")}
             className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ${
@@ -185,6 +220,7 @@ const RoutineManagement = () => {
               {formatDay(day)}
             </button>
           ))}
+
         </div>
       </div>
 
@@ -192,6 +228,7 @@ const RoutineManagement = () => {
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
 
         <div className="flex flex-col justify-between gap-4 border-b border-gray-100 p-5 sm:flex-row sm:items-center">
+
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
               My Weekly Routine
@@ -216,6 +253,7 @@ const RoutineManagement = () => {
               className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 sm:w-72"
             />
           </div>
+
         </div>
 
         {loading ? (
@@ -225,6 +263,7 @@ const RoutineManagement = () => {
               size={32}
             />
           </div>
+
         ) : error ? (
           <div className="p-10 text-center">
             <AlertCircle
@@ -232,7 +271,9 @@ const RoutineManagement = () => {
               size={40}
             />
 
-            <p className="mt-3 text-sm text-red-600">{error}</p>
+            <p className="mt-3 text-sm text-red-600">
+              {error}
+            </p>
 
             <button
               onClick={fetchRoutines}
@@ -241,6 +282,7 @@ const RoutineManagement = () => {
               Try Again
             </button>
           </div>
+
         ) : filteredRoutines.length === 0 ? (
           <div className="p-12 text-center">
             <CalendarDays
@@ -253,12 +295,15 @@ const RoutineManagement = () => {
             </h3>
 
             <p className="mt-1 text-sm text-gray-500">
-              No class schedule is available for this selection.
+              Your class routine is not available yet. If you have
+              not been assigned a class, please contact the Admin.
             </p>
           </div>
+
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[750px] text-left">
+
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-5 py-4">SL</th>
@@ -282,13 +327,16 @@ const RoutineManagement = () => {
 
                     <td className="px-5 py-4">
                       <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold capitalize text-blue-700">
-                        {routine.day}
+                        {formatDay(routine.day)}
                       </span>
                     </td>
 
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <BookOpen size={17} className="text-blue-500" />
+                        <BookOpen
+                          size={17}
+                          className="text-blue-500"
+                        />
 
                         <div>
                           <p className="font-medium text-gray-800">
@@ -304,13 +352,17 @@ const RoutineManagement = () => {
 
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <User size={16} className="text-gray-400" />
+                        <User
+                          size={16}
+                          className="text-gray-400"
+                        />
                         {routine.teacherId?.name || "N/A"}
                       </div>
                     </td>
 
                     <td className="px-5 py-4 text-sm text-gray-700">
                       {routine.classId?.className || "N/A"}
+
                       <span className="ml-1 text-xs text-gray-500">
                         {routine.classId?.section || ""}
                       </span>
@@ -325,9 +377,11 @@ const RoutineManagement = () => {
                   </tr>
                 ))}
               </tbody>
+
             </table>
           </div>
         )}
+
       </div>
     </div>
   );

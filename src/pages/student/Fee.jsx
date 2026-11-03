@@ -14,34 +14,69 @@ import api from "../../services/api";
 
 const Fee = () => {
   const [fees, setFees] = useState([]);
+
   const [summary, setSummary] = useState({
     totalFee: 0,
     paidAmount: 0,
     dueAmount: 0,
   });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Fetch Student Fee
   const fetchFees = async () => {
     try {
       setLoading(true);
       setError("");
 
       const response = await api.get("/fee/student-fees");
-      const result = response.data;
 
-      const feeData = result?.data?.fees || [];
+      const feeData = response.data?.data;
 
-      setFees(feeData);
-      setSummary({
-        totalFee: result?.data?.totalFee || 0,
-        paidAmount: result?.data?.paidAmount || 0,
-        dueAmount: result?.data?.dueAmount || 0,
-      });
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to load fee information."
+      // Backend returns one fee object, not an array
+      const feeRecords = feeData ? [feeData] : [];
+
+      setFees(feeRecords);
+
+      // Calculate summary
+      const totalFee = feeRecords.reduce(
+        (sum, fee) => sum + Number(fee.totalFee || 0),
+        0
       );
+
+      const paidAmount = feeRecords.reduce(
+        (sum, fee) => sum + Number(fee.paidAmount || 0),
+        0
+      );
+
+      const dueAmount = feeRecords.reduce(
+        (sum, fee) => sum + Number(fee.dueAmount || 0),
+        0
+      );
+
+      setSummary({
+        totalFee,
+        paidAmount,
+        dueAmount,
+      });
+
+    } catch (err) {
+      console.error("Student Fee Error:", err);
+
+      setError(
+        err.response?.data?.message ||
+          "Failed to load fee information."
+      );
+
+      setFees([]);
+
+      setSummary({
+        totalFee: 0,
+        paidAmount: 0,
+        dueAmount: 0,
+      });
+
     } finally {
       setLoading(false);
     }
@@ -51,58 +86,83 @@ const Fee = () => {
     fetchFees();
   }, []);
 
+  // Currency Format
   const formatCurrency = (amount) => {
     return `৳ ${Number(amount || 0).toLocaleString("en-BD")}`;
   };
 
+  // Status Style
   const getStatusStyle = (status) => {
     switch (status) {
       case "Paid":
         return "bg-green-100 text-green-700";
+
       case "Partial":
         return "bg-yellow-100 text-yellow-700";
+
       case "Due":
         return "bg-red-100 text-red-700";
+
       default:
         return "bg-gray-100 text-gray-700";
     }
   };
 
+  // Status Icon
   const getStatusIcon = (status) => {
     switch (status) {
       case "Paid":
         return <CheckCircle size={16} />;
+
       case "Partial":
         return <Clock size={16} />;
+
       case "Due":
         return <AlertCircle size={16} />;
+
       default:
         return <Receipt size={16} />;
     }
   };
 
+  // Loading Screen
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="mx-auto animate-spin text-blue-600" size={35} />
-          <p className="mt-3 text-gray-500">Loading fee information...</p>
+          <RefreshCw
+            className="mx-auto animate-spin text-blue-600"
+            size={35}
+          />
+
+          <p className="mt-3 text-gray-500">
+            Loading fee information...
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error && fees.length === 0) {
+  // Error Screen
+  if (error) {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
-        <AlertCircle className="mx-auto text-red-500" size={40} />
+        <AlertCircle
+          className="mx-auto text-red-500"
+          size={40}
+        />
+
         <h2 className="mt-3 text-lg font-semibold text-red-700">
           Unable to Load Fees
         </h2>
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+
+        <p className="mt-2 text-sm text-red-600">
+          {error}
+        </p>
+
         <button
           onClick={fetchFees}
-          className="mt-5 rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700"
+          className="mt-5 rounded-lg bg-blue-600 px-5 py-2 text-white transition hover:bg-blue-700"
         >
           Try Again
         </button>
@@ -110,6 +170,7 @@ const Fee = () => {
     );
   }
 
+  // Summary Cards
   const cards = [
     {
       title: "Total Fee",
@@ -131,14 +192,25 @@ const Fee = () => {
     },
   ];
 
+  // Payment Percentage
+  const paymentPercentage =
+    summary.totalFee > 0
+      ? Math.min(
+          (summary.paidAmount / summary.totalFee) * 100,
+          100
+        )
+      : 0;
+
   return (
     <div className="space-y-6">
+
       {/* Page Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">
             Fee Management
           </h1>
+
           <p className="mt-1 text-sm text-gray-500">
             View your fee records and payment information.
           </p>
@@ -165,6 +237,7 @@ const Fee = () => {
                 <p className="text-sm font-medium text-gray-500">
                   {card.title}
                 </p>
+
                 <h2 className="mt-2 text-2xl font-bold text-gray-800">
                   {formatCurrency(card.amount)}
                 </h2>
@@ -184,8 +257,12 @@ const Fee = () => {
           <div className="rounded-xl bg-white/20 p-3">
             <CreditCard size={25} />
           </div>
+
           <div>
-            <h2 className="text-lg font-semibold">Payment Overview</h2>
+            <h2 className="text-lg font-semibold">
+              Payment Overview
+            </h2>
+
             <p className="text-sm text-blue-100">
               Your overall fee payment information
             </p>
@@ -195,40 +272,36 @@ const Fee = () => {
         <div className="mt-6">
           <div className="mb-2 flex justify-between text-sm">
             <span>Payment Progress</span>
+
             <span>
-              {summary.totalFee > 0
-                ? Math.round(
-                    (summary.paidAmount / summary.totalFee) * 100
-                  )
-                : 0}
-              %
+              {Math.round(paymentPercentage)}%
             </span>
           </div>
 
           <div className="h-3 overflow-hidden rounded-full bg-white/25">
             <div
-              className="h-full rounded-full bg-white transition-all"
+              className="h-full rounded-full bg-white transition-all duration-500"
               style={{
-                width: `${
-                  summary.totalFee > 0
-                    ? Math.min(
-                        (summary.paidAmount / summary.totalFee) * 100,
-                        100
-                      )
-                    : 0
-                }%`,
+                width: `${paymentPercentage}%`,
               }}
             />
           </div>
+
+          <p className="mt-3 text-sm text-blue-100">
+            {formatCurrency(summary.paidAmount)} paid out of{" "}
+            {formatCurrency(summary.totalFee)}
+          </p>
         </div>
       </div>
 
       {/* Fee Records */}
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+
         <div className="border-b border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800">
             My Fee Records
           </h2>
+
           <p className="mt-1 text-sm text-gray-500">
             Total {fees.length} fee record(s)
           </p>
@@ -236,10 +309,15 @@ const Fee = () => {
 
         {fees.length === 0 ? (
           <div className="p-10 text-center">
-            <Receipt className="mx-auto text-gray-300" size={45} />
+            <Receipt
+              className="mx-auto text-gray-300"
+              size={45}
+            />
+
             <h3 className="mt-3 font-semibold text-gray-700">
               No Fee Records Found
             </h3>
+
             <p className="mt-1 text-sm text-gray-500">
               Your fee information has not been added yet.
             </p>
@@ -247,6 +325,7 @@ const Fee = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[650px] text-left">
+
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-5 py-4">SL</th>
@@ -270,7 +349,9 @@ const Fee = () => {
 
                     <td className="px-5 py-4 text-sm text-gray-600">
                       {fee.createdAt
-                        ? new Date(fee.createdAt).toLocaleDateString("en-GB")
+                        ? new Date(
+                            fee.createdAt
+                          ).toLocaleDateString("en-GB")
                         : "N/A"}
                     </td>
 
@@ -299,10 +380,12 @@ const Fee = () => {
                   </tr>
                 ))}
               </tbody>
+
             </table>
           </div>
         )}
       </div>
+
     </div>
   );
 };
