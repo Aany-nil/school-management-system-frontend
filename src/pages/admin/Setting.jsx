@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Settings,
   School,
@@ -17,11 +17,14 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import api from "../../services/api";
+
 const initialSettings = {
   schoolName: "My School",
   schoolEmail: "",
   schoolPhone: "",
   schoolAddress: "",
+  schoolLogo: "",
   academicYear: "2026",
   currentSession: "2026-2027",
   semester: "First Semester",
@@ -47,51 +50,200 @@ export default function SettingsManagement() {
   const [activeTab, setActiveTab] = useState("school");
   const [settings, setSettings] = useState(initialSettings);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("success");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Load settings from MongoDB
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      setMessage("");
+
+      const response = await api.get("/settings/setting");
+
+      const school = response.data.data.school || {};
+      const admin = response.data.data.admin || {};
+
+      setSettings({
+        ...initialSettings,
+        schoolName: school.schoolName || "My School",
+        schoolEmail: school.schoolEmail || "",
+        schoolPhone: school.schoolPhone || "",
+        schoolAddress: school.schoolAddress || "",
+        schoolLogo: school.schoolLogo || "",
+        academicYear: school.academicYear || "2026",
+        currentSession: school.currentSession || "2026-2027",
+        semester: school.semester || "First Semester",
+        language: school.language || "English",
+        timezone: school.timezone || "Asia/Dhaka",
+        dateFormat: school.dateFormat || "DD/MM/YYYY",
+        adminName: admin.name || "",
+        adminEmail: admin.email || "",
+      });
+    } catch (error) {
+      setMessage(
+        error.response?.data?.message ||
+          "Failed to load settings. Please try again."
+      );
+      setMessageType("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setSettings((prev) => ({
       ...prev,
       [name]: value,
     }));
+
     setMessage("");
   };
 
-  const handleSave = (e) => {
+  // Save settings according to active section
+  const handleSave = async (e) => {
     e.preventDefault();
 
-    if (activeTab === "password") {
-      if (
-        !settings.currentPassword ||
-        !settings.newPassword ||
-        !settings.confirmPassword
-      ) {
-        setMessage("Please fill in all password fields.");
-        return;
+    setMessage("");
+    setSaving(true);
+
+    try {
+      if (activeTab === "school") {
+        const payload = {
+          schoolName: settings.schoolName,
+          schoolEmail: settings.schoolEmail,
+          schoolPhone: settings.schoolPhone,
+          schoolAddress: settings.schoolAddress,
+          schoolLogo: settings.schoolLogo,
+        };
+
+        await api.put("/settings/update-setting", payload);
+
+        setMessage("School information saved successfully.");
       }
 
-      if (settings.newPassword.length < 8) {
-        setMessage("New password must be at least 8 characters.");
-        return;
+      else if (activeTab === "academic") {
+        const payload = {
+          academicYear: settings.academicYear,
+          currentSession: settings.currentSession,
+          semester: settings.semester,
+        };
+
+        await api.put("/settings/update-setting", payload);
+
+        setMessage("Academic settings saved successfully.");
       }
 
-      if (settings.newPassword !== settings.confirmPassword) {
-        setMessage("New password and confirm password do not match.");
-        return;
+      else if (activeTab === "general") {
+        const payload = {
+          language: settings.language,
+          timezone: settings.timezone,
+          dateFormat: settings.dateFormat,
+        };
+
+        await api.put("/settings/update-setting", payload);
+
+        setMessage("General settings saved successfully.");
       }
 
+      else if (activeTab === "profile") {
+        const payload = {
+          name: settings.adminName,
+          email: settings.adminEmail,
+        };
+
+        const response = await api.put("/settings/profile", payload);
+
+        const admin = response.data.data;
+
+        setSettings((prev) => ({
+          ...prev,
+          adminName: admin.name,
+          adminEmail: admin.email,
+        }));
+
+        setMessage("Admin profile updated successfully.");
+      }
+
+      else if (activeTab === "password") {
+        const {
+          currentPassword,
+          newPassword,
+          confirmPassword,
+        } = settings;
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          setMessage("Please fill in all password fields.");
+          setMessageType("error");
+          return;
+        }
+
+        if (newPassword.length < 8) {
+          setMessage("New password must be at least 8 characters.");
+          setMessageType("error");
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          setMessage("New password and confirm password do not match.");
+          setMessageType("error");
+          return;
+        }
+
+        const response = await api.put("/settings/password", {
+          currentPassword,
+          newPassword,
+          confirmPassword,
+        });
+
+        setSettings((prev) => ({
+          ...prev,
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        }));
+
+        setMessage(
+          response.data.message || "Password updated successfully."
+        );
+      }
+
+      setMessageType("success");
+    } catch (error) {
       setMessage(
-        "Password validation successful. Backend API is not connected yet."
+        error.response?.data?.message ||
+          "Something went wrong. Please try again."
       );
+
+      setMessageType("error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Reset current form using saved database values
+  const handleReset = () => {
+    if (activeTab === "password") {
+      setSettings((prev) => ({
+        ...prev,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      }));
+
+      setMessage("Password fields cleared.");
+      setMessageType("success");
       return;
     }
 
-    setMessage("Settings updated in this session.");
-  };
-
-  const handleReset = () => {
-    setSettings(initialSettings);
-    setMessage("Form has been reset.");
+    loadSettings();
   };
 
   const inputClass =
@@ -175,28 +327,39 @@ export default function SettingsManagement() {
             )}
 
             <div className="md:col-span-2">
-              <label className={labelClass}>School Logo</label>
+              <label className={labelClass}>School Logo URL</label>
 
               <div className="flex flex-wrap items-center gap-4 rounded-xl border border-dashed border-gray-300 p-5">
-                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                  <Image size={30} />
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl bg-blue-50 text-blue-600">
+                  {settings.schoolLogo ? (
+                    <img
+                      src={settings.schoolLogo}
+                      alt="School Logo"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <Image size={30} />
+                  )}
                 </div>
 
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-gray-700">
-                    Upload School Logo
+                    School Logo
                   </p>
+
+                  <input
+                    type="text"
+                    name="schoolLogo"
+                    value={settings.schoolLogo}
+                    onChange={handleChange}
+                    placeholder="Enter school logo image URL"
+                    className={`${inputClass} mt-2`}
+                  />
 
                   <p className="mt-1 text-xs text-gray-400">
-                    Logo upload UI only. Backend upload is not connected.
+                    Provide an image URL. Direct file upload is not configured yet.
                   </p>
                 </div>
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="text-sm"
-                />
               </div>
             </div>
           </div>
@@ -332,6 +495,19 @@ export default function SettingsManagement() {
     (item) => item.id === activeTab
   );
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+          <p className="mt-3 text-sm text-gray-500">
+            Loading settings...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       <div className="mx-auto max-w-7xl">
@@ -439,7 +615,13 @@ export default function SettingsManagement() {
               {renderSection()}
 
               {message && (
-                <div className="mt-5 rounded-lg bg-blue-50 p-3 text-sm text-blue-700">
+                <div
+                  className={`mt-5 rounded-lg p-3 text-sm ${
+                    messageType === "success"
+                      ? "bg-green-50 text-green-700"
+                      : "bg-red-50 text-red-700"
+                  }`}
+                >
                   {message}
                 </div>
               )}
@@ -448,7 +630,8 @@ export default function SettingsManagement() {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="flex items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg border border-gray-200 px-5 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
                 >
                   <RotateCcw size={17} />
                   Reset
@@ -456,10 +639,11 @@ export default function SettingsManagement() {
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Save size={17} />
-                  Save Changes
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
