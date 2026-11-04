@@ -59,14 +59,13 @@ export default function StudentDashboard() {
     fetchDashboard();
   }, []);
 
-  // Fetch Only Logged-in Student's Routine
+  // Fetch Student Routine
   useEffect(() => {
     const fetchStudentRoutine = async () => {
       try {
         setRoutineLoading(true);
 
         const response = await api.get("/routine/all");
-
         const routineData = response.data?.data;
 
         setRoutines(
@@ -101,7 +100,7 @@ export default function StudentDashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-80 items-center justify-center">
+      <div className="flex min-h-80 items-center justify-center px-4">
         <div className="text-center">
           <LoaderCircle
             className="mx-auto animate-spin text-blue-600"
@@ -117,14 +116,16 @@ export default function StudentDashboard() {
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-white p-6">
+      <div className="rounded-2xl border border-red-200 bg-white p-4 sm:p-6">
         <AlertCircle className="mb-3 text-red-500" size={30} />
 
         <h2 className="font-bold text-slate-900">
           Unable to load dashboard
         </h2>
 
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 break-words text-sm text-red-600">
+          {error}
+        </p>
 
         <button
           onClick={() => window.location.reload()}
@@ -136,17 +137,18 @@ export default function StudentDashboard() {
     );
   }
 
-  // Backend Data
   const attendance = dashboard?.attendance || {};
+
   const results = Array.isArray(dashboard?.results)
     ? dashboard.results
     : [];
+
   const fees = dashboard?.fees || {};
+
   const notices = Array.isArray(dashboard?.recentNotices)
     ? dashboard.recentNotices
     : [];
 
-  // Attendance Calculation
   const present = Number(attendance.present || 0);
   const absent = Number(attendance.absent || 0);
   const late = Number(attendance.late || 0);
@@ -216,48 +218,49 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 to-indigo-600 p-6 text-white shadow-lg sm:p-8">
-        <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/10" />
-        <div className="absolute -bottom-20 right-40 h-48 w-48 rounded-full bg-white/5" />
+    <div className="w-full min-w-0 space-y-6 sm:space-y-8">
 
-        <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-          <div>
+      {/* Welcome Section */}
+      <section className="relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-600 p-5 text-white shadow-lg sm:rounded-3xl sm:p-8">
+        <div className="absolute -right-10 -top-16 h-56 w-56 rounded-full bg-white/10" />
+        <div className="absolute -bottom-20 right-10 h-48 w-48 rounded-full bg-white/5 sm:right-40" />
+
+        <div className="relative flex min-w-0 flex-col justify-between gap-5 sm:flex-row sm:items-center sm:gap-6">
+          <div className="min-w-0">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium">
               <GraduationCap size={16} />
               Student Dashboard
             </div>
 
-            <h1 className="text-2xl font-bold sm:text-3xl">
+            <h1 className="break-words text-xl font-bold sm:text-2xl lg:text-3xl">
               Welcome back, {studentName}!
             </h1>
 
-            <p className="mt-3 max-w-xl text-sm leading-6 text-blue-100 sm:text-base">
+            <p className="mt-3 max-w-xl text-xs leading-6 text-blue-100 sm:text-sm lg:text-base">
               Here is an overview of your attendance, academic results,
               fees and school announcements.
             </p>
           </div>
 
-          <div className="hidden rounded-2xl bg-white/10 p-5 sm:block">
+          <div className="hidden shrink-0 rounded-2xl bg-white/10 p-5 sm:block">
             <GraduationCap size={58} strokeWidth={1.5} />
           </div>
         </div>
       </section>
 
       {/* Statistics */}
-      <section>
+      <section className="w-full min-w-0">
         <div className="mb-4">
           <h2 className="text-lg font-bold text-slate-900">
             Academic Overview
           </h2>
 
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
             Your academic information at a glance.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid w-full grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {stats.map((stat) => {
             const Icon = stat.icon;
 
@@ -265,25 +268,28 @@ export default function StudentDashboard() {
               <Link
                 to={stat.path}
                 key={stat.title}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:-translate-y-1 hover:shadow-md sm:rounded-2xl sm:p-5"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">
+                <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-xs font-medium text-slate-500 sm:text-sm">
                       {stat.title}
                     </p>
 
-                    <h3 className="mt-3 break-words text-2xl font-bold text-slate-900">
+                    <h3 className="mt-2 break-words text-lg font-bold text-slate-900 sm:mt-3 sm:text-2xl">
                       {stat.value}
                     </h3>
 
-                    <p className="mt-2 text-xs text-slate-500">
+                    <p className="mt-1 break-words text-[10px] text-slate-500 sm:mt-2 sm:text-xs">
                       {stat.subtitle}
                     </p>
                   </div>
 
-                  <div className={`rounded-xl p-3 ${stat.color}`}>
-                    <Icon size={23} />
+                  <div
+                    className={`shrink-0 rounded-lg p-2 sm:rounded-xl sm:p-3 ${stat.color}`}
+                  >
+                    <Icon size={19} className="sm:hidden" />
+                    <Icon size={23} className="hidden sm:block" />
                   </div>
                 </div>
               </Link>
@@ -293,62 +299,75 @@ export default function StudentDashboard() {
       </section>
 
       {/* Attendance and Fees */}
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <section className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
+
         {/* Attendance Summary */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <h2 className="font-bold text-slate-900">
                 Attendance Summary
               </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 Your recorded attendance
               </p>
             </div>
 
-            <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
-              <CalendarCheck size={22} />
+            <div className="shrink-0 rounded-xl bg-blue-100 p-2.5 text-blue-700 sm:p-3">
+              <CalendarCheck size={21} />
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-3">
-            <div className="rounded-xl bg-green-50 p-3 text-center">
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3">
+            <div className="rounded-xl bg-green-50 p-2 text-center sm:p-3">
               <CheckCircle2
                 className="mx-auto text-green-600"
-                size={21}
+                size={20}
               />
 
-              <p className="mt-2 text-xl font-bold text-green-700">
+              <p className="mt-2 text-lg font-bold text-green-700 sm:text-xl">
                 {present}
               </p>
 
-              <p className="text-xs text-slate-500">Present</p>
+              <p className="text-[10px] text-slate-500 sm:text-xs">
+                Present
+              </p>
             </div>
 
-            <div className="rounded-xl bg-red-50 p-3 text-center">
-              <XCircle className="mx-auto text-red-600" size={21} />
+            <div className="rounded-xl bg-red-50 p-2 text-center sm:p-3">
+              <XCircle
+                className="mx-auto text-red-600"
+                size={20}
+              />
 
-              <p className="mt-2 text-xl font-bold text-red-700">
+              <p className="mt-2 text-lg font-bold text-red-700 sm:text-xl">
                 {absent}
               </p>
 
-              <p className="text-xs text-slate-500">Absent</p>
+              <p className="text-[10px] text-slate-500 sm:text-xs">
+                Absent
+              </p>
             </div>
 
-            <div className="rounded-xl bg-amber-50 p-3 text-center">
-              <Clock className="mx-auto text-amber-600" size={21} />
+            <div className="rounded-xl bg-amber-50 p-2 text-center sm:p-3">
+              <Clock
+                className="mx-auto text-amber-600"
+                size={20}
+              />
 
-              <p className="mt-2 text-xl font-bold text-amber-700">
+              <p className="mt-2 text-lg font-bold text-amber-700 sm:text-xl">
                 {late}
               </p>
 
-              <p className="text-xs text-slate-500">Late</p>
+              <p className="text-[10px] text-slate-500 sm:text-xs">
+                Late
+              </p>
             </div>
           </div>
 
           <div className="mt-5">
-            <div className="mb-2 flex justify-between text-xs text-slate-500">
+            <div className="mb-2 flex justify-between gap-2 text-xs text-slate-500">
               <span>Attendance Rate</span>
 
               <span className="font-semibold text-blue-700">
@@ -366,51 +385,57 @@ export default function StudentDashboard() {
 
           <Link
             to="/student/attendance"
-            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+            className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-800 sm:text-sm"
           >
             View attendance <ArrowRight size={16} />
           </Link>
         </div>
 
         {/* Fee Summary */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-900">Fee Summary</h2>
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-900">
+                Fee Summary
+              </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 Your payment overview
               </p>
             </div>
 
-            <div className="rounded-xl bg-amber-100 p-3 text-amber-700">
-              <Wallet size={22} />
+            <div className="shrink-0 rounded-xl bg-amber-100 p-2.5 text-amber-700 sm:p-3">
+              <Wallet size={21} />
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-5 space-y-4 sm:mt-6">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-slate-500">Total Fees</span>
+              <span className="text-xs text-slate-500 sm:text-sm">
+                Total Fees
+              </span>
 
-              <span className="font-semibold text-slate-900">
+              <span className="break-all text-right text-sm font-semibold text-slate-900 sm:text-base">
                 ৳{totalFee.toLocaleString()}
               </span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-slate-500">Paid Amount</span>
+              <span className="text-xs text-slate-500 sm:text-sm">
+                Paid Amount
+              </span>
 
-              <span className="font-semibold text-green-700">
+              <span className="break-all text-right text-sm font-semibold text-green-700 sm:text-base">
                 ৳{paidFee.toLocaleString()}
               </span>
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              <span className="text-sm font-medium text-slate-600">
+              <span className="text-xs font-medium text-slate-600 sm:text-sm">
                 Due Amount
               </span>
 
-              <span className="font-bold text-red-600">
+              <span className="break-all text-right text-sm font-bold text-red-600 sm:text-base">
                 ৳{dueFee.toLocaleString()}
               </span>
             </div>
@@ -418,7 +443,7 @@ export default function StudentDashboard() {
 
           <Link
             to="/student/fees"
-            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+            className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-800 sm:text-sm"
           >
             View fee details <ArrowRight size={16} />
           </Link>
@@ -426,19 +451,25 @@ export default function StudentDashboard() {
       </section>
 
       {/* Results and Routine */}
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {/* Recent Results */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-900">Recent Results</h2>
+      <section className="grid min-w-0 grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
 
-              <p className="mt-1 text-sm text-slate-500">
+        {/* Recent Results */}
+        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-900">
+                Recent Results
+              </h2>
+
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 Your latest academic results
               </p>
             </div>
 
-            <ClipboardList className="text-violet-600" size={23} />
+            <ClipboardList
+              className="shrink-0 text-violet-600"
+              size={23}
+            />
           </div>
 
           {results.length > 0 ? (
@@ -446,22 +477,22 @@ export default function StudentDashboard() {
               {results.slice(0, 5).map((result, index) => (
                 <div
                   key={result._id || result.id || index}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-4"
+                  className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 sm:gap-3 sm:p-4"
                 >
-                  <div>
-                    <p className="font-semibold text-slate-800">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold text-slate-800">
                       {result.subjectId?.subjectName ||
                         result.subjectId?.name ||
                         "Subject"}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 break-words text-xs text-slate-500">
                       {result.examName || "Examination"}
                     </p>
                   </div>
 
-                  <div className="text-right">
-                    <p className="font-bold text-slate-900">
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-bold text-slate-900 sm:text-base">
                       {result.marks ?? 0}/{result.totalMarks ?? 0}
                     </p>
 
@@ -487,24 +518,29 @@ export default function StudentDashboard() {
 
           <Link
             to="/student/results"
-            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+            className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-800 sm:text-sm"
           >
             View all results <ArrowRight size={16} />
           </Link>
         </div>
 
         {/* My Routine */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-bold text-slate-900">My Routine</h2>
+            <div className="min-w-0">
+              <h2 className="font-bold text-slate-900">
+                My Routine
+              </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 Your assigned class schedule
               </p>
             </div>
 
-            <BookOpen className="text-blue-600" size={23} />
+            <BookOpen
+              className="shrink-0 text-blue-600"
+              size={23}
+            />
           </div>
 
           {routineLoading ? (
@@ -523,14 +559,14 @@ export default function StudentDashboard() {
               {routines.slice(0, 4).map((routine) => (
                 <div
                   key={routine._id}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-4"
+                  className="flex min-w-0 items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 sm:gap-3 sm:p-4"
                 >
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold text-slate-800">
                       {routine.subjectId?.subjectName || "Subject"}
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 break-words text-xs text-slate-500">
                       {routine.teacherId?.name || "Teacher"}
                     </p>
 
@@ -540,7 +576,7 @@ export default function StudentDashboard() {
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <p className="text-xs font-semibold text-slate-700">
+                    <p className="text-xs font-semibold text-slate-700 sm:text-sm">
                       {routine.startTime}
                     </p>
 
@@ -570,7 +606,7 @@ export default function StudentDashboard() {
 
           <Link
             to="/student/routine"
-            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800"
+            className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-800 sm:text-sm"
           >
             View full routine <ArrowRight size={16} />
           </Link>
@@ -578,18 +614,20 @@ export default function StudentDashboard() {
       </section>
 
       {/* School Notices */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold text-slate-900">School Notices</h2>
+          <div className="min-w-0">
+            <h2 className="font-bold text-slate-900">
+              School Notices
+            </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
               Latest announcements from your school
             </p>
           </div>
 
-          <div className="rounded-xl bg-indigo-100 p-3 text-indigo-700">
-            <Bell size={22} />
+          <div className="shrink-0 rounded-xl bg-indigo-100 p-2.5 text-indigo-700 sm:p-3">
+            <Bell size={21} />
           </div>
         </div>
 
@@ -598,18 +636,18 @@ export default function StudentDashboard() {
             {notices.slice(0, 5).map((notice, index) => (
               <div
                 key={notice._id || notice.id || index}
-                className="flex items-start gap-3 py-4 first:pt-0 last:pb-0"
+                className="flex min-w-0 items-start gap-3 py-4 first:pt-0 last:pb-0"
               >
-                <div className="mt-1 rounded-lg bg-blue-50 p-2 text-blue-600">
+                <div className="mt-1 shrink-0 rounded-lg bg-blue-50 p-2 text-blue-600">
                   <Bell size={17} />
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-slate-800">
+                  <h3 className="break-words text-sm font-semibold text-slate-800 sm:text-base">
                     {getNoticeTitle(notice)}
                   </h3>
 
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                  <p className="mt-1 break-words text-xs leading-6 text-slate-500 sm:text-sm">
                     {notice.message ||
                       notice.description ||
                       notice.content ||
@@ -625,7 +663,10 @@ export default function StudentDashboard() {
           </div>
         ) : (
           <div className="py-10 text-center">
-            <Bell className="mx-auto text-slate-300" size={38} />
+            <Bell
+              className="mx-auto text-slate-300"
+              size={38}
+            />
 
             <p className="mt-3 text-sm text-slate-500">
               There are no notices to display.
