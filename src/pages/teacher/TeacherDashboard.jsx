@@ -27,7 +27,6 @@ const TeacherDashboard = () => {
       setError("");
 
       const response = await api.get("/dashboard/teacher");
-
       setDashboard(response.data.data);
     } catch (err) {
       setError(
@@ -44,7 +43,6 @@ const TeacherDashboard = () => {
   }, []);
 
   const profile = dashboard?.profile;
-
   const recentNotices = dashboard?.recentNotices || [];
 
   const stats = [
@@ -87,12 +85,12 @@ const TeacherDashboard = () => {
     amber: "bg-amber-50 text-amber-600",
   };
 
+  // Loading Screen
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <div className="text-center">
           <RefreshCw className="mx-auto h-9 w-9 animate-spin text-blue-600" />
-
           <p className="mt-3 text-sm font-medium text-slate-600">
             Loading your dashboard...
           </p>
@@ -101,21 +99,24 @@ const TeacherDashboard = () => {
     );
   }
 
+  // Error Screen
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6 flex items-center justify-center">
-        <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
+      <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-5 sm:p-8 text-center shadow-sm">
           <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
 
           <h2 className="mt-4 text-xl font-bold text-slate-800">
             Something went wrong
           </h2>
 
-          <p className="mt-2 text-sm text-slate-500">{error}</p>
+          <p className="mt-2 text-sm text-slate-500 break-words">
+            {error}
+          </p>
 
           <button
             onClick={fetchDashboard}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
           >
             <RefreshCw size={16} />
             Try Again
@@ -126,39 +127,40 @@ const TeacherDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-7">
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-5 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-5 sm:space-y-7">
 
         {/* Header */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <p className="text-sm font-medium text-blue-600">
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm font-medium text-blue-600">
               School Management System
             </p>
 
-            <h1 className="mt-1 text-2xl font-bold text-slate-800 sm:text-3xl">
+            <h1 className="mt-1 text-xl font-bold text-slate-800 sm:text-3xl">
               Teacher Dashboard
             </h1>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 text-xs sm:text-sm text-slate-500">
               Welcome back! Here is your teaching overview.
             </p>
           </div>
 
           <button
             onClick={fetchDashboard}
-            className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+            disabled={loading}
+            className="inline-flex w-full sm:w-fit items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
             Refresh
           </button>
         </div>
 
-        {/* Profile Welcome Card */}
-        <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-600 p-6 text-white shadow-lg sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+        {/* Welcome Profile Card */}
+        <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-600 p-4 sm:p-6 lg:p-8 text-white shadow-md">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
 
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/30 bg-white/20">
+            <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/30 bg-white/20">
               {profile?.profilePicture ? (
                 <img
                   src={profile.profilePicture}
@@ -166,20 +168,20 @@ const TeacherDashboard = () => {
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <GraduationCap size={38} />
+                <GraduationCap size={34} />
               )}
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-blue-100">
+              <p className="text-xs sm:text-sm text-blue-100">
                 Welcome back,
               </p>
 
-              <h2 className="mt-1 text-2xl font-bold sm:text-3xl">
+              <h2 className="mt-1 break-words text-xl font-bold sm:text-3xl">
                 {profile?.name || "Teacher"}
               </h2>
 
-              <p className="mt-2 text-sm text-blue-100">
+              <p className="mt-2 break-all text-xs sm:text-sm text-blue-100">
                 {profile?.email || "Teacher account"}
               </p>
 
@@ -207,35 +209,35 @@ const TeacherDashboard = () => {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4">
           {stats.map((item) => {
             const Icon = item.icon;
 
             return (
               <div
                 key={item.title}
-                className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row sm:items-center">
 
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-slate-500">
                       {item.title}
                     </p>
 
-                    <h3 className="mt-3 text-2xl font-bold text-slate-800">
+                    <h3 className="mt-2 break-words text-lg font-bold text-slate-800 sm:mt-3 sm:text-2xl">
                       {item.value}
                     </h3>
 
-                    <p className="mt-2 text-xs text-slate-400">
+                    <p className="mt-1.5 text-[10px] leading-4 text-slate-400 sm:mt-2 sm:text-xs">
                       {item.description}
                     </p>
                   </div>
 
                   <div
-                    className={`rounded-xl p-4 ${colorClasses[item.color]}`}
+                    className={`w-fit rounded-xl p-2.5 sm:p-3.5 ${colorClasses[item.color]}`}
                   >
-                    <Icon size={25} />
+                    <Icon size={22} />
                   </div>
 
                 </div>
@@ -245,13 +247,13 @@ const TeacherDashboard = () => {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
 
           {/* Profile Information */}
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-1">
+          <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm lg:col-span-1">
 
             <div className="mb-5 flex items-center gap-3">
-              <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+              <div className="rounded-xl bg-blue-50 p-2.5 sm:p-3 text-blue-600">
                 <UserCircle size={22} />
               </div>
 
@@ -270,16 +272,16 @@ const TeacherDashboard = () => {
 
               <div className="flex items-start gap-3">
                 <UserCircle
-                  className="mt-0.5 text-slate-400"
+                  className="mt-0.5 shrink-0 text-slate-400"
                   size={18}
                 />
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-slate-400">
                     Full Name
                   </p>
 
-                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-700">
                     {profile?.name || "Not available"}
                   </p>
                 </div>
@@ -287,11 +289,11 @@ const TeacherDashboard = () => {
 
               <div className="flex items-start gap-3">
                 <Mail
-                  className="mt-0.5 text-slate-400"
+                  className="mt-0.5 shrink-0 text-slate-400"
                   size={18}
                 />
 
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-slate-400">
                     Email Address
                   </p>
@@ -304,16 +306,16 @@ const TeacherDashboard = () => {
 
               <div className="flex items-start gap-3">
                 <MapPin
-                  className="mt-0.5 text-slate-400"
+                  className="mt-0.5 shrink-0 text-slate-400"
                   size={18}
                 />
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-slate-400">
                     Address
                   </p>
 
-                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                  <p className="mt-1 break-words text-sm font-semibold text-slate-700">
                     {profile?.address || "Address not added"}
                   </p>
                 </div>
@@ -324,7 +326,7 @@ const TeacherDashboard = () => {
                   About Me
                 </p>
 
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 break-words text-sm leading-6 text-slate-600">
                   {profile?.bio || "No bio added yet."}
                 </p>
               </div>
@@ -333,12 +335,12 @@ const TeacherDashboard = () => {
           </div>
 
           {/* Recent Notices */}
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm lg:col-span-2">
+          <div className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-sm lg:col-span-2">
 
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
 
-                <div className="rounded-xl bg-amber-50 p-3 text-amber-600">
+                <div className="rounded-xl bg-amber-50 p-2.5 sm:p-3 text-amber-600">
                   <Bell size={22} />
                 </div>
 
@@ -360,24 +362,24 @@ const TeacherDashboard = () => {
             </div>
 
             {recentNotices.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {recentNotices.map((notice) => (
                   <div
                     key={notice._id}
-                    className="rounded-xl border border-slate-100 p-4 transition hover:border-blue-200 hover:bg-blue-50/30"
+                    className="rounded-xl border border-slate-100 p-3 sm:p-4 transition hover:-translate-y-1 hover:border-blue-200 hover:bg-blue-50/30"
                   >
                     <div className="flex items-start gap-3">
 
-                      <div className="mt-1 rounded-lg bg-amber-50 p-2 text-amber-600">
+                      <div className="mt-1 shrink-0 rounded-lg bg-amber-50 p-2 text-amber-600">
                         <Bell size={17} />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-semibold text-slate-800">
+                        <h4 className="break-words text-sm font-semibold text-slate-800 sm:text-base">
                           {notice.title}
                         </h4>
 
-                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                        <p className="mt-2 line-clamp-2 break-words text-xs leading-6 text-slate-500 sm:text-sm">
                           {notice.description}
                         </p>
 
@@ -399,7 +401,7 @@ const TeacherDashboard = () => {
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl bg-slate-50 py-12 text-center">
+              <div className="rounded-xl bg-slate-50 py-10 sm:py-12 text-center">
                 <Bell
                   className="mx-auto text-slate-300"
                   size={35}
@@ -409,7 +411,7 @@ const TeacherDashboard = () => {
                   No notices available
                 </p>
 
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 px-3 text-xs text-slate-400 sm:text-sm">
                   New school announcements will appear here.
                 </p>
               </div>
@@ -419,9 +421,9 @@ const TeacherDashboard = () => {
         </div>
 
         {/* Footer Info */}
-        <div className="flex flex-col items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-5 py-4 text-center sm:flex-row sm:text-left">
+        <div className="flex flex-col items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-4 py-4 text-center shadow-sm sm:flex-row sm:px-5 sm:text-left">
 
-          <p className="text-sm text-slate-500">
+          <p className="text-xs text-slate-500 sm:text-sm">
             Keep up with your classes and school announcements.
           </p>
 
