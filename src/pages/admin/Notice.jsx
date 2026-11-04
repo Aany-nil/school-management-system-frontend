@@ -14,6 +14,8 @@ import {
   BookOpen,
   CalendarDays,
   Megaphone,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 
 import api from "../../services/api";
@@ -24,6 +26,9 @@ const INITIAL_FORM = {
   targetRole: "all",
   publishDate: "",
 };
+
+const inputClass =
+  "w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
 function getErrorMessage(error) {
   return (
@@ -40,6 +45,7 @@ function getArray(response) {
   if (Array.isArray(body)) return body;
   if (Array.isArray(body?.data)) return body.data;
   if (Array.isArray(body?.notices)) return body.notices;
+  if (Array.isArray(body?.data?.notices)) return body.data.notices;
 
   return [];
 }
@@ -80,6 +86,39 @@ function getRoleLabel(role) {
   return "Everyone";
 }
 
+function SummaryCard({ title, value, description, icon, color }) {
+  const colors = {
+    blue: "bg-blue-50 text-blue-600",
+    violet: "bg-violet-50 text-violet-600",
+    green: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+  };
+
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">
+            {title}
+          </p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+            {value}
+          </h2>
+          <p className="mt-1 text-[10px] text-slate-400 sm:text-xs">
+            {description}
+          </p>
+        </div>
+
+        <div
+          className={`shrink-0 rounded-lg p-2 sm:rounded-xl sm:p-3 ${colors[color]}`}
+        >
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Notice() {
   const [notices, setNotices] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);
@@ -94,12 +133,18 @@ export default function Notice() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [viewLoading, setViewLoading] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const [role] = useState(() => {
-    const keys = ["user", "school_user", "sms_user"];
+    const keys = [
+      "user",
+      "tasmina_user",
+      "school_user",
+      "sms_user",
+    ];
 
     for (const key of keys) {
       try {
@@ -114,7 +159,7 @@ export default function Notice() {
       }
     }
 
-    return "";
+    return String(localStorage.getItem("role") || "").toLowerCase();
   });
 
   const isAdmin = role === "admin";
@@ -127,6 +172,7 @@ export default function Notice() {
       const response = await api.get("/notice/all-notice");
       setNotices(getArray(response));
     } catch (err) {
+      setNotices([]);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
@@ -154,6 +200,7 @@ export default function Notice() {
     setForm(INITIAL_FORM);
     setEditingId(null);
     setShowForm(false);
+    setError("");
   };
 
   const openCreateForm = () => {
@@ -222,7 +269,10 @@ export default function Notice() {
         setSuccess("Notice created successfully.");
       }
 
-      resetForm();
+      setForm(INITIAL_FORM);
+      setEditingId(null);
+      setShowForm(false);
+
       await fetchNotices();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -232,6 +282,8 @@ export default function Notice() {
   };
 
   const handleDelete = async (noticeId) => {
+    if (!noticeId) return;
+
     const confirmed = window.confirm(
       "Are you sure you want to delete this notice?"
     );
@@ -260,6 +312,9 @@ export default function Notice() {
   };
 
   const handleView = async (notice) => {
+    setViewLoading(true);
+    setSelectedNotice(notice);
+
     try {
       const response = await api.get(
         `/notice/single-notice/${notice._id}`
@@ -268,50 +323,57 @@ export default function Notice() {
       setSelectedNotice(response.data?.data || notice);
     } catch {
       setSelectedNotice(notice);
+    } finally {
+      setViewLoading(false);
     }
   };
 
   const totalNotices = notices.length;
+
   const everyoneCount = notices.filter(
     (notice) => notice.targetRole === "all"
   ).length;
+
   const teacherCount = notices.filter(
     (notice) => notice.targetRole === "teacher"
   ).length;
+
   const studentCount = notices.filter(
     (notice) => notice.targetRole === "student"
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
+    <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-8">
+      <div className="mx-auto w-full max-w-7xl min-w-0">
+
         {/* Page Header */}
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600">
+        <div className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-blue-600 sm:text-sm">
               <span className="h-2 w-2 rounded-full bg-blue-600" />
               School Management System
             </div>
 
-            <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              <Bell className="h-8 w-8 text-blue-600" />
+            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900 sm:gap-3 sm:text-3xl">
+              <Bell className="h-7 w-7 shrink-0 text-blue-600 sm:h-8 sm:w-8" />
               Notice Management
             </h1>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 sm:mt-2 sm:text-sm">
               Create and manage school announcements.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <button
               type="button"
               onClick={fetchNotices}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50 sm:px-4 sm:text-sm"
             >
               <RefreshCw
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                size={16}
+                className={loading ? "animate-spin" : ""}
               />
               Refresh
             </button>
@@ -320,289 +382,101 @@ export default function Notice() {
               <button
                 type="button"
                 onClick={openCreateForm}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:px-5 sm:text-sm"
               >
-                <Plus className="h-4 w-4" />
+                <Plus size={17} />
                 Create Notice
               </button>
             )}
           </div>
         </div>
 
-        {/* Alerts */}
-        {error && (
+        {/* Page Alerts */}
+        {error && !showForm && (
           <div
             role="alert"
-            className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:p-4"
           >
-            <span className="font-bold">!</span>
-            <p>{error}</p>
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p className="break-words">{error}</p>
           </div>
         )}
 
         {success && (
           <div
             role="status"
-            className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"
+            className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 sm:p-4"
           >
-            {success}
+            <CheckCircle size={18} className="mt-0.5 shrink-0" />
+            <p>{success}</p>
           </div>
         )}
 
         {/* Summary Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Total Notices
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {totalNotices}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  All announcements
-                </p>
-              </div>
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-5 xl:grid-cols-4">
+          <SummaryCard
+            title="Total Notices"
+            value={totalNotices}
+            description="All announcements"
+            icon={<Bell size={22} />}
+            color="blue"
+          />
 
-              <div className="rounded-2xl bg-blue-50 p-4 text-blue-600">
-                <Bell className="h-7 w-7" />
-              </div>
-            </div>
-          </div>
+          <SummaryCard
+            title="Everyone"
+            value={everyoneCount}
+            description="General announcements"
+            icon={<Users size={22} />}
+            color="violet"
+          />
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Everyone
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {everyoneCount}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  General announcements
-                </p>
-              </div>
+          <SummaryCard
+            title="Teachers"
+            value={teacherCount}
+            description="Teacher announcements"
+            icon={<GraduationCap size={22} />}
+            color="green"
+          />
 
-              <div className="rounded-2xl bg-violet-50 p-4 text-violet-600">
-                <Users className="h-7 w-7" />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Teachers
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {teacherCount}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Teacher announcements
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-600">
-                <GraduationCap className="h-7 w-7" />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Students
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {studentCount}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Student announcements
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-amber-50 p-4 text-amber-600">
-                <BookOpen className="h-7 w-7" />
-              </div>
-            </div>
-          </div>
+          <SummaryCard
+            title="Students"
+            value={studentCount}
+            description="Student announcements"
+            icon={<BookOpen size={22} />}
+            color="amber"
+          />
         </div>
 
-        {/* Create/Edit Notice Form */}
-        {showForm && isAdmin && (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  {editingId ? "Edit Notice" : "Create Notice"}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Fill in the announcement details below.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={resetForm}
-                disabled={saving}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200 disabled:opacity-50"
-                aria-label="Close form"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-5 sm:p-6">
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="title"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Notice Title <span className="text-red-500">*</span>
-                  </label>
-
-                  <input
-                    id="title"
-                    name="title"
-                    type="text"
-                    value={form.title}
-                    onChange={handleChange}
-                    maxLength={100}
-                    placeholder="Enter notice title"
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="targetRole"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Target Audience <span className="text-red-500">*</span>
-                  </label>
-
-                  <select
-                    id="targetRole"
-                    name="targetRole"
-                    value={form.targetRole}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="all">Everyone</option>
-                    <option value="teacher">Teachers</option>
-                    <option value="student">Students</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="publishDate"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Publish Date & Time
-                  </label>
-
-                  <input
-                    id="publishDate"
-                    name="publishDate"
-                    type="datetime-local"
-                    value={form.publishDate}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5">
-                <label
-                  htmlFor="description"
-                  className="mb-2 block text-sm font-semibold text-slate-700"
-                >
-                  Notice Description <span className="text-red-500">*</span>
-                </label>
-
-                <textarea
-                  id="description"
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  placeholder="Write the full notice here..."
-                  rows={5}
-                  required
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                />
-              </div>
-
-              <div className="mt-7 flex flex-wrap gap-3 border-t border-slate-100 pt-5">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? (
-                    "Saving..."
-                  ) : editingId ? (
-                    <>
-                      <Pencil className="h-4 w-4" />
-                      Update Notice
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4" />
-                      Publish Notice
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  disabled={saving}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
-
         {/* Notice List */}
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:px-6">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:px-6 sm:py-5">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-base font-bold text-slate-900 sm:text-lg">
                 All Notices
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 {filteredNotices.length} notice
                 {filteredNotices.length === 1 ? "" : "s"} found
               </p>
             </div>
 
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-              <Megaphone className="h-4 w-4" />
+              <Megaphone size={15} />
               School Announcements
             </span>
           </div>
 
           {/* Search and Filter */}
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:px-6">
-            <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3.5 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
-              <Search className="h-4 w-4 shrink-0 text-slate-400" />
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:p-5 sm:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 px-3.5 transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
+              <Search size={17} className="shrink-0 text-slate-400" />
 
               <input
                 type="text"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search notices..."
-                className="w-full border-0 bg-transparent py-3 text-sm outline-none"
+                className="w-full min-w-0 border-0 bg-transparent py-3 text-sm outline-none"
               />
             </div>
 
@@ -610,7 +484,7 @@ export default function Notice() {
               value={roleFilter}
               onChange={(event) => setRoleFilter(event.target.value)}
               aria-label="Filter notices by audience"
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 sm:w-48"
             >
               <option value="all">All Audiences</option>
               <option value="teacher">Teachers</option>
@@ -620,7 +494,7 @@ export default function Notice() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center px-5 py-16">
-              <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+              <RefreshCw size={32} className="animate-spin text-blue-600" />
               <p className="mt-4 text-sm text-slate-500">
                 Loading notices...
               </p>
@@ -628,14 +502,14 @@ export default function Notice() {
           ) : filteredNotices.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
               <div className="mb-4 rounded-2xl bg-slate-100 p-4 text-slate-400">
-                <Bell className="h-10 w-10" />
+                <Bell size={36} />
               </div>
 
               <h3 className="text-base font-bold text-slate-800">
                 No notices found
               </h3>
 
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 max-w-sm text-sm text-slate-500">
                 Try another search or create a new notice.
               </p>
 
@@ -645,13 +519,13 @@ export default function Notice() {
                   onClick={openCreateForm}
                   className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus size={16} />
                   Add First Notice
                 </button>
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[850px] text-left text-sm">
                 <thead>
                   <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
@@ -701,7 +575,7 @@ export default function Notice() {
 
                       <td className="px-5 py-4 text-slate-600">
                         <span className="inline-flex items-center gap-2">
-                          <CalendarDays className="h-4 w-4 text-slate-400" />
+                          <CalendarDays size={15} className="text-slate-400" />
                           {formatDate(notice.publishDate)}
                         </span>
                       </td>
@@ -719,7 +593,7 @@ export default function Notice() {
                             aria-label="View notice"
                             className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-100"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye size={15} />
                           </button>
 
                           {isAdmin && (
@@ -731,7 +605,7 @@ export default function Notice() {
                                 aria-label="Edit notice"
                                 className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-700 transition hover:bg-amber-100"
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Pencil size={15} />
                               </button>
 
                               <button
@@ -742,7 +616,11 @@ export default function Notice() {
                                 aria-label="Delete notice"
                                 className="rounded-lg border border-red-200 bg-red-50 p-2 text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                {deletingId === notice._id ? (
+                                  <RefreshCw size={15} className="animate-spin" />
+                                ) : (
+                                  <Trash2 size={15} />
+                                )}
                               </button>
                             </>
                           )}
@@ -755,72 +633,309 @@ export default function Notice() {
             </div>
           )}
 
-          <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs text-slate-400 sm:px-6">
+          <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-400 sm:px-6">
             School Notice Management
           </div>
         </section>
+      </div>
 
-        {/* Notice Details Modal */}
-        {selectedNotice && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-            onClick={() => setSelectedNotice(null)}
+      {/* CREATE / EDIT NOTICE POPUP */}
+      {showForm && isAdmin && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !saving) {
+              resetForm();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notice-modal-title"
+            className="my-auto flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
           >
-            <div
-              role="dialog"
-              aria-modal="true"
-              className="w-full max-w-xl rounded-2xl bg-white shadow-xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 p-5">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
-                    <Bell className="h-5 w-5" />
-                  </div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    Notice Details
-                  </h2>
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="hidden rounded-xl bg-blue-50 p-3 text-blue-600 sm:block">
+                  {editingId ? <Pencil size={21} /> : <Megaphone size={21} />}
                 </div>
 
+                <div className="min-w-0">
+                  <h2
+                    id="notice-modal-title"
+                    className="text-base font-bold text-slate-900 sm:text-lg"
+                  >
+                    {editingId ? "Edit Notice" : "Create New Notice"}
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+                    {editingId
+                      ? "Update your school announcement."
+                      : "Fill in the details to publish a notice."}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={saving}
+                className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
+                aria-label="Close popup"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            {/* Scrollable Form */}
+            <form
+              id="notice-form"
+              onSubmit={handleSubmit}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                {error && (
+                  <div
+                    role="alert"
+                    className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p className="break-words">{error}</p>
+                  </div>
+                )}
+
+                <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50/60 p-3 sm:p-4">
+                  <p className="text-xs font-semibold text-blue-800 sm:text-sm">
+                    Notice Information
+                  </p>
+                  <p className="mt-1 text-xs text-blue-600">
+                    Add a title, audience, publish date and full description.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                  <div>
+                    <label
+                      htmlFor="title"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Notice Title <span className="text-red-500">*</span>
+                    </label>
+
+                    <input
+                      id="title"
+                      name="title"
+                      type="text"
+                      value={form.title}
+                      onChange={handleChange}
+                      maxLength={100}
+                      placeholder="Enter notice title"
+                      required
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="targetRole"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Target Audience <span className="text-red-500">*</span>
+                    </label>
+
+                    <select
+                      id="targetRole"
+                      name="targetRole"
+                      value={form.targetRole}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    >
+                      <option value="all">Everyone</option>
+                      <option value="teacher">Teachers</option>
+                      <option value="student">Students</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label
+                      htmlFor="publishDate"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Publish Date & Time
+                    </label>
+
+                    <input
+                      id="publishDate"
+                      name="publishDate"
+                      type="datetime-local"
+                      value={form.publishDate}
+                      onChange={handleChange}
+                      className={inputClass}
+                    />
+                    <p className="mt-1.5 text-xs text-slate-400">
+                      Leave empty to publish with the current date and time.
+                    </p>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label
+                      htmlFor="description"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Notice Description <span className="text-red-500">*</span>
+                    </label>
+
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={form.description}
+                      onChange={handleChange}
+                      placeholder="Write the full notice here..."
+                      rows={6}
+                      required
+                      className={`${inputClass} resize-y`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Fixed Modal Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white p-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
                 <button
                   type="button"
-                  onClick={() => setSelectedNotice(null)}
-                  className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
-                  aria-label="Close details"
+                  onClick={resetForm}
+                  disabled={saving}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
                 >
-                  <X className="h-5 w-5" />
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      {editingId ? <Pencil size={16} /> : <Plus size={17} />}
+                      {editingId ? "Update Notice" : "Publish Notice"}
+                    </>
+                  )}
                 </button>
               </div>
+            </form>
+          </section>
+        </div>
+      )}
 
-              <div className="p-5 sm:p-6">
-                <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                  {getRoleLabel(selectedNotice.targetRole)}
-                </span>
+      {/* NOTICE DETAILS POPUP */}
+      {selectedNotice && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedNotice(null);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notice-details-title"
+            className="my-auto flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            {/* Details Header */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
+                  <Bell size={20} />
+                </div>
 
-                <h3 className="mt-4 text-xl font-bold text-slate-900">
-                  {selectedNotice.title}
-                </h3>
-
-                <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">
-                  {selectedNotice.description}
-                </p>
-
-                <div className="mt-6 border-t border-slate-100 pt-4 text-sm text-slate-500">
-                  <p className="flex items-center gap-2">
-                    <CalendarDays className="h-4 w-4" />
-                    {formatDate(selectedNotice.publishDate)}
-                  </p>
-
-                  <p className="mt-2">
-                    Created by:{" "}
-                    {selectedNotice.createdBy?.name || "School Admin"}
+                <div>
+                  <h2
+                    id="notice-details-title"
+                    className="text-base font-bold text-slate-900"
+                  >
+                    Notice Details
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    School announcement information
                   </p>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedNotice(null)}
+                className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                aria-label="Close details"
+              >
+                <X size={20} />
+              </button>
             </div>
-          </div>
-        )}
-      </div>
+
+            {/* Details Body */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+              {viewLoading && (
+                <div className="mb-4 flex items-center gap-2 text-xs text-blue-600">
+                  <RefreshCw size={14} className="animate-spin" />
+                  Refreshing notice details...
+                </div>
+              )}
+
+              <span
+                className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  selectedNotice.targetRole === "teacher"
+                    ? "bg-violet-50 text-violet-700"
+                    : selectedNotice.targetRole === "student"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-blue-50 text-blue-700"
+                }`}
+              >
+                {getRoleLabel(selectedNotice.targetRole)}
+              </span>
+
+              <h3 className="mt-4 break-words text-xl font-bold text-slate-900">
+                {selectedNotice.title}
+              </h3>
+
+              <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-600">
+                {selectedNotice.description}
+              </p>
+
+              <div className="mt-6 space-y-3 border-t border-slate-100 pt-4 text-sm text-slate-500">
+                <p className="flex items-start gap-2">
+                  <CalendarDays size={16} className="mt-0.5 shrink-0" />
+                  <span>{formatDate(selectedNotice.publishDate)}</span>
+                </p>
+
+                <p>
+                  Created by:{" "}
+                  {selectedNotice.createdBy?.name || "School Admin"}
+                </p>
+              </div>
+            </div>
+
+            {/* Details Footer */}
+            <div className="shrink-0 border-t border-slate-100 bg-white p-4 sm:px-6">
+              <button
+                type="button"
+                onClick={() => setSelectedNotice(null)}
+                className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
