@@ -57,14 +57,21 @@ const getArray = (response) => {
 };
 
 const getUser = () => {
-  try {
-    return (
-      JSON.parse(localStorage.getItem("user") || "null") ||
-      JSON.parse(localStorage.getItem("tasmina_user") || "null")
-    );
-  } catch {
-    return null;
+  const keys = ["user", "tasmina_user"];
+
+  for (const key of keys) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (!stored) continue;
+
+      const user = JSON.parse(stored);
+      if (user) return user;
+    } catch {
+      continue;
+    }
   }
+
+  return null;
 };
 
 const formatDate = (date) => {
@@ -107,6 +114,7 @@ export default function AttendanceManagement() {
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -126,14 +134,12 @@ export default function AttendanceManagement() {
   const isAdmin = role === "admin";
   const isTeacher = role === "teacher";
 
-  // Admin: view and delete only.
-  // Teacher: create and update attendance.
-  // Student: view own attendance only.
+  // Permissions
   const canCreate = isTeacher;
   const canEdit = isTeacher;
   const canDelete = isAdmin;
 
-  // Load classes according to user role.
+  // Load classes according to user role
   const loadOptions = useCallback(async () => {
     if (isStudent) {
       setClasses([]);
@@ -142,7 +148,6 @@ export default function AttendanceManagement() {
     }
 
     setOptionsLoading(true);
-    setError("");
 
     try {
       let response;
@@ -176,31 +181,33 @@ export default function AttendanceManagement() {
     }
   }, [isAdmin, isStudent, isTeacher, filterClass]);
 
-  // Load students only for the selected class.
-  const loadClassStudents = useCallback(async (classId) => {
-    if (!classId || !isTeacher) {
-      setStudents([]);
-      return;
-    }
+  // Load students for selected class
+  const loadClassStudents = useCallback(
+    async (classId) => {
+      if (!classId || !isTeacher) {
+        setStudents([]);
+        return;
+      }
 
-    setOptionsLoading(true);
-    setError("");
+      setOptionsLoading(true);
 
-    try {
-      const response = await api.get("/attendance/students", {
-        params: { classId },
-      });
+      try {
+        const response = await api.get("/attendance/students", {
+          params: { classId },
+        });
 
-      setStudents(getArray(response));
-    } catch (err) {
-      setStudents([]);
-      setError(`Could not load students: ${getErrorMessage(err)}`);
-    } finally {
-      setOptionsLoading(false);
-    }
-  }, [isTeacher]);
+        setStudents(getArray(response));
+      } catch (err) {
+        setStudents([]);
+        setError(`Could not load students: ${getErrorMessage(err)}`);
+      } finally {
+        setOptionsLoading(false);
+      }
+    },
+    [isTeacher]
+  );
 
-  // Load attendance according to role.
+  // Load attendance according to role
   const loadAttendance = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -236,6 +243,7 @@ export default function AttendanceManagement() {
     loadAttendance();
   }, [loadAttendance]);
 
+  // Open create modal
   const openCreateModal = () => {
     if (!canCreate) return;
 
@@ -247,6 +255,7 @@ export default function AttendanceManagement() {
     setModalOpen(true);
   };
 
+  // Open edit modal
   const openEditModal = (record) => {
     if (!canEdit) return;
 
@@ -265,6 +274,7 @@ export default function AttendanceManagement() {
     setModalOpen(true);
   };
 
+  // Close modal
   const closeModal = () => {
     if (saving) return;
 
@@ -275,6 +285,7 @@ export default function AttendanceManagement() {
     setError("");
   };
 
+  // Handle input changes
   const handleChange = async (event) => {
     const { name, value } = event.target;
 
@@ -289,6 +300,7 @@ export default function AttendanceManagement() {
     }
   };
 
+  // Create or update attendance
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -345,8 +357,9 @@ export default function AttendanceManagement() {
     }
   };
 
+  // Delete attendance
   const handleDelete = async (record) => {
-    if (!canDelete) return;
+    if (!canDelete || deletingId) return;
 
     const confirmed = window.confirm(
       "Are you sure you want to delete this attendance record?"
@@ -356,6 +369,7 @@ export default function AttendanceManagement() {
 
     setError("");
     setSuccess("");
+    setDeletingId(record._id);
 
     try {
       await api.delete(`/attendance/delete/${record._id}`);
@@ -364,9 +378,12 @@ export default function AttendanceManagement() {
       await loadAttendance();
     } catch (err) {
       setError(getErrorMessage(err));
+    } finally {
+      setDeletingId(null);
     }
   };
 
+  // Search filter
   const filteredAttendance = attendance.filter((record) => {
     const studentName =
       typeof record.student === "object"
@@ -411,20 +428,21 @@ export default function AttendanceManagement() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-8">
+      <div className="mx-auto w-full max-w-7xl min-w-0 space-y-5 sm:space-y-6">
+
         {/* Header */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <p className="mb-2 text-sm text-slate-500">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-blue-600">
               Academic Management / Attendance
             </p>
 
-            <h1 className="text-2xl font-bold text-slate-800 sm:text-3xl">
+            <h1 className="text-xl font-bold text-slate-800 sm:text-2xl lg:text-3xl">
               Attendance Management
             </h1>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
               {isAdmin
                 ? "Monitor attendance records across all classes."
                 : isTeacher
@@ -438,12 +456,12 @@ export default function AttendanceManagement() {
               type="button"
               onClick={openCreateModal}
               disabled={optionsLoading || classes.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {optionsLoading ? (
-                <LoaderCircle size={19} className="animate-spin" />
+                <LoaderCircle size={18} className="animate-spin" />
               ) : (
-                <Plus size={19} />
+                <Plus size={18} />
               )}
               Add Attendance
             </button>
@@ -451,13 +469,14 @@ export default function AttendanceManagement() {
         </div>
 
         {/* Alerts */}
-        {error && (
+        {error && !modalOpen && (
           <div
             role="alert"
-            className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
-            <AlertCircle size={19} className="mt-0.5 shrink-0" />
-            <span className="flex-1">{error}</span>
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <span className="min-w-0 flex-1 break-words">{error}</span>
+
             <button
               type="button"
               onClick={() => setError("")}
@@ -471,9 +490,10 @@ export default function AttendanceManagement() {
         {success && (
           <div
             role="status"
-            className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700"
+            className="flex items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
           >
             <span>{success}</span>
+
             <button
               type="button"
               onClick={() => setSuccess("")}
@@ -484,125 +504,132 @@ export default function AttendanceManagement() {
           </div>
         )}
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           <SummaryCard
             title="Total Records"
             value={filteredAttendance.length}
-            icon={<Users size={23} />}
+            icon={<Users size={21} />}
             color="blue"
           />
 
           <SummaryCard
             title="Present"
             value={presentCount}
-            icon={<CheckCircle2 size={23} />}
+            icon={<CheckCircle2 size={21} />}
             color="green"
           />
 
           <SummaryCard
             title="Absent"
             value={absentCount}
-            icon={<XCircle size={23} />}
+            icon={<XCircle size={21} />}
             color="red"
           />
 
           <SummaryCard
             title="Late"
             value={lateCount}
-            icon={<Clock size={23} />}
+            icon={<Clock size={21} />}
             color="amber"
           />
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row">
-          <div className="relative flex-1">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
 
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search student, email, class or status..."
-              className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-
-          {!isStudent && (
-            <>
-              <select
-                value={filterClass}
-                onChange={(event) => setFilterClass(event.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-              >
-                <option value="">
-                  {isAdmin ? "All Classes" : "All My Classes"}
-                </option>
-
-                {classes.map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.className}
-                    {item.section ? ` - ${item.section}` : ""}
-                  </option>
-                ))}
-              </select>
+            {/* Search */}
+            <div className="relative w-full min-w-0 flex-1">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
 
               <input
-                type="date"
-                value={filterDate}
-                onChange={(event) => setFilterDate(event.target.value)}
-                aria-label="Filter by date"
-                className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search student, email, class or status..."
+                className="w-full rounded-lg border border-slate-200 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
-            </>
-          )}
+            </div>
 
-          <button
-            type="button"
-            onClick={async () => {
-              await loadOptions();
-              await loadAttendance();
-            }}
-            disabled={loading || optionsLoading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            <RefreshCw
-              size={17}
-              className={loading || optionsLoading ? "animate-spin" : ""}
-            />
-            Refresh
-          </button>
+            {!isStudent && (
+              <>
+                <select
+                  value={filterClass}
+                  onChange={(event) => setFilterClass(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500 lg:w-48"
+                >
+                  <option value="">
+                    {isAdmin ? "All Classes" : "All My Classes"}
+                  </option>
+
+                  {classes.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.className}
+                      {item.section ? ` - ${item.section}` : ""}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(event) => setFilterDate(event.target.value)}
+                  aria-label="Filter by date"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-3 text-sm outline-none focus:border-blue-500 lg:w-auto"
+                />
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                await loadOptions();
+                await loadAttendance();
+              }}
+              disabled={loading || optionsLoading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 lg:w-auto"
+            >
+              <RefreshCw
+                size={17}
+                className={
+                  loading || optionsLoading ? "animate-spin" : ""
+                }
+              />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Attendance table */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-100 px-5 py-4">
-            <h2 className="font-semibold text-slate-800">
+        {/* Attendance Table */}
+        <div className="w-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-1 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <h2 className="font-bold text-slate-800">
               Attendance Records
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="text-xs text-slate-500">
               {filteredAttendance.length} records found
             </p>
           </div>
 
           {loading ? (
-            <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-slate-500">
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-slate-500">
               <LoaderCircle
                 size={30}
                 className="animate-spin text-blue-600"
               />
+
               <p className="text-sm">Loading attendance...</p>
             </div>
           ) : filteredAttendance.length === 0 ? (
-            <div className="flex min-h-52 flex-col items-center justify-center gap-3 px-5 text-center">
-              <CalendarCheck size={34} className="text-slate-300" />
+            <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 px-4 text-center">
+              <CalendarCheck size={35} className="text-slate-300" />
 
-              <p className="font-medium text-slate-700">
+              <p className="font-semibold text-slate-700">
                 No attendance records found
               </p>
 
@@ -611,12 +638,14 @@ export default function AttendanceManagement() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                  <tr>
+                <thead className="bg-slate-50">
+                  <tr className="text-xs uppercase tracking-wider text-slate-500">
                     {!isStudent && (
-                      <th className="px-5 py-4 font-semibold">Student</th>
+                      <th className="px-5 py-4 font-semibold">
+                        Student
+                      </th>
                     )}
 
                     <th className="px-5 py-4 font-semibold">Class</th>
@@ -634,10 +663,13 @@ export default function AttendanceManagement() {
 
                 <tbody className="divide-y divide-slate-100">
                   {filteredAttendance.map((record) => (
-                    <tr key={record._id} className="hover:bg-slate-50">
+                    <tr
+                      key={record._id}
+                      className="transition hover:bg-slate-50"
+                    >
                       {!isStudent && (
                         <td className="px-5 py-4">
-                          <p className="font-medium text-slate-800">
+                          <p className="font-semibold text-slate-800">
                             {record.student?.name || "Unknown Student"}
                           </p>
 
@@ -669,7 +701,7 @@ export default function AttendanceManagement() {
                         </span>
                       </td>
 
-                      <td className="max-w-xs px-5 py-4 text-slate-500">
+                      <td className="max-w-[220px] px-5 py-4 text-slate-500">
                         <span className="block truncate">
                           {record.remarks || "—"}
                         </span>
@@ -683,9 +715,9 @@ export default function AttendanceManagement() {
                                 type="button"
                                 onClick={() => openEditModal(record)}
                                 title="Edit attendance"
-                                className="rounded-lg border border-blue-100 p-2 text-blue-600 hover:bg-blue-50"
+                                className="rounded-lg bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-100"
                               >
-                                <Pencil size={17} />
+                                <Pencil size={16} />
                               </button>
                             )}
 
@@ -693,10 +725,18 @@ export default function AttendanceManagement() {
                               <button
                                 type="button"
                                 onClick={() => handleDelete(record)}
+                                disabled={deletingId === record._id}
                                 title="Delete attendance"
-                                className="rounded-lg border border-red-100 p-2 text-red-600 hover:bg-red-50"
+                                className="rounded-lg bg-red-50 p-2 text-red-600 transition hover:bg-red-100 disabled:opacity-50"
                               >
-                                <Trash2 size={17} />
+                                {deletingId === record._id ? (
+                                  <LoaderCircle
+                                    size={16}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Trash2 size={16} />
+                                )}
                               </button>
                             )}
                           </div>
@@ -708,28 +748,48 @@ export default function AttendanceManagement() {
               </table>
             </div>
           )}
+
+          {!loading && filteredAttendance.length > 0 && (
+            <div className="flex flex-col gap-1 border-t border-slate-100 px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <span>
+                Showing {filteredAttendance.length} attendance records
+              </span>
+
+              <span>Attendance Management</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Teacher Create / Edit modal */}
+      {/* Create / Edit Modal */}
       {modalOpen && canCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4">
+        <div
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-slate-900/60 p-3 sm:items-center sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeModal();
+            }
+          }}
+        >
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="attendance-modal-title"
-            className="my-auto w-full max-w-lg rounded-2xl bg-white shadow-2xl"
+            className="my-auto flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-              <div>
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
+              <div className="min-w-0">
                 <h2
                   id="attendance-modal-title"
-                  className="text-xl font-bold text-slate-800"
+                  className="text-lg font-bold text-slate-800 sm:text-xl"
                 >
-                  {editingRecord ? "Update Attendance" : "Mark Attendance"}
+                  {editingRecord
+                    ? "Update Attendance"
+                    : "Mark Attendance"}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                   {editingRecord
                     ? "Change the status or remarks."
                     : "Select your class, student, date and status."}
@@ -741,164 +801,185 @@ export default function AttendanceManagement() {
                 onClick={closeModal}
                 disabled={saving}
                 aria-label="Close modal"
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
               >
-                <X size={21} />
+                <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 p-6">
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-lg bg-red-50 p-3 text-sm text-red-700"
-                >
-                  {error}
-                </div>
-              )}
-
-              {!editingRecord && (
-                <>
-                  <div>
-                    <label
-                      htmlFor="classId"
-                      className="mb-2 block text-sm font-medium text-slate-700"
-                    >
-                      Class <span className="text-red-500">*</span>
-                    </label>
-
-                    <select
-                      id="classId"
-                      name="classId"
-                      value={form.classId}
-                      onChange={handleChange}
-                      required
-                      disabled={optionsLoading}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                    >
-                      <option value="">
-                        {optionsLoading ? "Loading classes..." : "Select class"}
-                      </option>
-
-                      {classes.map((item) => (
-                        <option key={item._id} value={item._id}>
-                          {item.className}
-                          {item.section ? ` - ${item.section}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="student"
-                      className="mb-2 block text-sm font-medium text-slate-700"
-                    >
-                      Student <span className="text-red-500">*</span>
-                    </label>
-
-                    <select
-                      id="student"
-                      name="student"
-                      value={form.student}
-                      onChange={handleChange}
-                      required
-                      disabled={!form.classId || optionsLoading}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                    >
-                      <option value="">
-                        {!form.classId
-                          ? "Select a class first"
-                          : optionsLoading
-                            ? "Loading students..."
-                            : "Select student"}
-                      </option>
-
-                      {students.map((student) => (
-                        <option key={student._id} value={student._id}>
-                          {student.name}
-                          {student.email ? ` (${student.email})` : ""}
-                        </option>
-                      ))}
-                    </select>
-
-                    {form.classId &&
-                      !optionsLoading &&
-                      students.length === 0 && (
-                        <p className="mt-2 text-xs text-amber-600">
-                          No students found in this class.
-                        </p>
-                      )}
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="date"
-                      className="mb-2 block text-sm font-medium text-slate-700"
-                    >
-                      Attendance Date <span className="text-red-500">*</span>
-                    </label>
-
-                    <input
-                      id="date"
-                      name="date"
-                      type="date"
-                      value={form.date}
-                      onChange={handleChange}
-                      required
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+            {/* Modal Form */}
+            <form
+              onSubmit={handleSubmit}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              {/* Scrollable Form Body */}
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-5 sm:p-6">
+                {error && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
+                    <AlertCircle
+                      size={17}
+                      className="mt-0.5 shrink-0"
                     />
+
+                    <span className="break-words">{error}</span>
                   </div>
-                </>
-              )}
+                )}
 
-              <div>
-                <label
-                  htmlFor="status"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Status <span className="text-red-500">*</span>
-                </label>
+                {!editingRecord && (
+                  <>
+                    {/* Class */}
+                    <div>
+                      <label
+                        htmlFor="classId"
+                        className="mb-1.5 block text-sm font-semibold text-slate-700"
+                      >
+                        Class <span className="text-red-500">*</span>
+                      </label>
 
-                <select
-                  id="status"
-                  name="status"
-                  value={form.status}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500"
-                >
-                  <option value="Present">Present</option>
-                  <option value="Absent">Absent</option>
-                  <option value="Late">Late</option>
-                </select>
+                      <select
+                        id="classId"
+                        name="classId"
+                        value={form.classId}
+                        onChange={handleChange}
+                        required
+                        disabled={optionsLoading}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                      >
+                        <option value="">
+                          {optionsLoading
+                            ? "Loading classes..."
+                            : "Select class"}
+                        </option>
+
+                        {classes.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {item.className}
+                            {item.section ? ` - ${item.section}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Student */}
+                    <div>
+                      <label
+                        htmlFor="student"
+                        className="mb-1.5 block text-sm font-semibold text-slate-700"
+                      >
+                        Student <span className="text-red-500">*</span>
+                      </label>
+
+                      <select
+                        id="student"
+                        name="student"
+                        value={form.student}
+                        onChange={handleChange}
+                        required
+                        disabled={!form.classId || optionsLoading}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                      >
+                        <option value="">
+                          {!form.classId
+                            ? "Select a class first"
+                            : optionsLoading
+                              ? "Loading students..."
+                              : "Select student"}
+                        </option>
+
+                        {students.map((student) => (
+                          <option key={student._id} value={student._id}>
+                            {student.name}
+                            {student.email ? ` (${student.email})` : ""}
+                          </option>
+                        ))}
+                      </select>
+
+                      {form.classId &&
+                        !optionsLoading &&
+                        students.length === 0 && (
+                          <p className="mt-1.5 text-xs text-amber-600">
+                            No students found in this class.
+                          </p>
+                        )}
+                    </div>
+
+                    {/* Date */}
+                    <div>
+                      <label
+                        htmlFor="date"
+                        className="mb-1.5 block text-sm font-semibold text-slate-700"
+                      >
+                        Attendance Date{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+
+                      <input
+                        id="date"
+                        name="date"
+                        type="date"
+                        value={form.date}
+                        onChange={handleChange}
+                        required
+                        className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Status */}
+                <div>
+                  <label
+                    htmlFor="status"
+                    className="mb-1.5 block text-sm font-semibold text-slate-700"
+                  >
+                    Status <span className="text-red-500">*</span>
+                  </label>
+
+                  <select
+                    id="status"
+                    name="status"
+                    value={form.status}
+                    onChange={handleChange}
+                    required
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="Present">Present</option>
+                    <option value="Absent">Absent</option>
+                    <option value="Late">Late</option>
+                  </select>
+                </div>
+
+                {/* Remarks */}
+                <div>
+                  <label
+                    htmlFor="remarks"
+                    className="mb-1.5 block text-sm font-semibold text-slate-700"
+                  >
+                    Remarks
+                  </label>
+
+                  <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows={3}
+                    value={form.remarks}
+                    onChange={handleChange}
+                    placeholder="Optional remarks"
+                    className="w-full resize-y rounded-lg border border-slate-300 px-3 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label
-                  htmlFor="remarks"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Remarks
-                </label>
-
-                <textarea
-                  id="remarks"
-                  name="remarks"
-                  rows={3}
-                  value={form.remarks}
-                  onChange={handleChange}
-                  placeholder="Optional remarks"
-                  className="w-full resize-y rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+              {/* Fixed Modal Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white p-4 sm:flex-row sm:justify-end sm:px-6">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-xl border border-slate-200 px-5 py-3 font-medium text-slate-700 hover:bg-slate-50"
+                  className="w-full rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -911,19 +992,23 @@ export default function AttendanceManagement() {
                     (!editingRecord &&
                       (!form.classId ||
                         !form.student ||
-                        !students.length))
+                        students.length === 0))
                   }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {saving && (
-                    <LoaderCircle size={18} className="animate-spin" />
+                  {saving ? (
+                    <>
+                      <LoaderCircle
+                        size={17}
+                        className="animate-spin"
+                      />
+                      Saving...
+                    </>
+                  ) : editingRecord ? (
+                    "Update Attendance"
+                  ) : (
+                    "Save Attendance"
                   )}
-
-                  {saving
-                    ? "Saving..."
-                    : editingRecord
-                      ? "Update Attendance"
-                      : "Save Attendance"}
                 </button>
               </div>
             </form>
@@ -934,6 +1019,7 @@ export default function AttendanceManagement() {
   );
 }
 
+// Summary Card Component
 function SummaryCard({ title, value, icon, color }) {
   const colors = {
     blue: "bg-blue-50 text-blue-600",
@@ -943,18 +1029,23 @@ function SummaryCard({ title, value, icon, color }) {
   };
 
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5">
       <div
-        className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-12 sm:w-12 sm:rounded-xl ${
           colors[color] || colors.blue
         }`}
       >
         {icon}
       </div>
 
-      <div>
-        <p className="text-sm text-slate-500">{title}</p>
-        <p className="mt-1 text-2xl font-bold text-slate-800">{value}</p>
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-medium text-slate-500 sm:text-sm">
+          {title}
+        </p>
+
+        <p className="mt-1 text-xl font-bold text-slate-800 sm:text-2xl">
+          {value}
+        </p>
       </div>
     </div>
   );
