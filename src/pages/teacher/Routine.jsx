@@ -77,17 +77,10 @@ const RoutineSystem = () => {
 
   const filteredRoutines = useMemo(() => {
     return routines.filter((routine) => {
-      const subjectName =
-        routine.subjectId?.subjectName || "";
-
-      const className =
-        routine.classId?.className || "";
-
-      const section =
-        routine.classId?.section || "";
-
-      const subjectCode =
-        routine.subjectId?.subjectCode || "";
+      const subjectName = routine.subjectId?.subjectName || "";
+      const className = routine.classId?.className || "";
+      const section = routine.classId?.section || "";
+      const subjectCode = routine.subjectId?.subjectCode || "";
 
       const matchesSearch = [
         subjectName,
@@ -102,8 +95,7 @@ const RoutineSystem = () => {
       const routineDay = normalizeDay(routine.day);
 
       const matchesDay =
-        selectedDay === "All" ||
-        routineDay === selectedDay;
+        selectedDay === "All" || routineDay === selectedDay;
 
       return matchesSearch && matchesDay;
     });
@@ -111,9 +103,7 @@ const RoutineSystem = () => {
 
   const getDayRoutines = (day) => {
     return filteredRoutines
-      .filter(
-        (routine) => normalizeDay(routine.day) === day
-      )
+      .filter((routine) => normalizeDay(routine.day) === day)
       .sort((a, b) =>
         (a.startTime || "").localeCompare(b.startTime || "")
       );
@@ -153,18 +143,18 @@ const RoutineSystem = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-3 sm:p-5 lg:p-8">
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-5 lg:p-6">
       <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
 
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
               <CalendarDays size={23} />
             </div>
 
             <div>
-              <h1 className="text-xl font-bold text-slate-800 sm:text-2xl lg:text-3xl">
+              <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
                 My Class Routine
               </h1>
 
@@ -178,27 +168,28 @@ const RoutineSystem = () => {
             type="button"
             onClick={fetchMyRoutine}
             disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             <RefreshCw
               size={17}
               className={loading ? "animate-spin" : ""}
             />
-            Refresh
+            {loading ? "Refreshing..." : "Refresh"}
           </button>
         </div>
 
         {/* Error */}
         {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:p-4">
             <AlertCircle size={18} className="mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
 
+          {/* Total Classes */}
           <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md sm:p-5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-medium text-slate-500 sm:text-sm">
@@ -219,6 +210,7 @@ const RoutineSystem = () => {
             </p>
           </div>
 
+          {/* Total Subjects */}
           <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md sm:p-5">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-medium text-slate-500 sm:text-sm">
@@ -239,7 +231,8 @@ const RoutineSystem = () => {
             </p>
           </div>
 
-          <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md lg:col-span-1 sm:p-5">
+          {/* Today's Classes */}
+          <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md sm:p-5 lg:col-span-1">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-medium text-slate-500 sm:text-sm">
                 Today's Classes
@@ -344,7 +337,7 @@ const RoutineSystem = () => {
                     className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                   >
                     {/* Day Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-4 sm:px-5">
                       <div className="flex items-center gap-2">
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
                           <CalendarDays size={18} />
@@ -370,17 +363,17 @@ const RoutineSystem = () => {
                     </div>
 
                     {/* Day Classes */}
-                    <div className="divide-y divide-slate-100">
+                    <div className="grid grid-cols-1 gap-3 p-3 min-[480px]:grid-cols-2 sm:gap-4 sm:p-4">
                       {dayRoutines.map((routine) => (
                         <div
                           key={routine._id}
-                          className="flex flex-col gap-4 p-4 transition-colors hover:bg-blue-50/40 sm:flex-row sm:items-center sm:p-5"
+                          className="flex min-w-0 flex-col justify-between gap-3 rounded-xl border border-slate-100 bg-white p-3 transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-md sm:p-4"
                         >
                           {/* Time */}
-                          <div className="flex w-full items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 sm:w-[175px] sm:shrink-0">
-                            <Clock size={17} className="shrink-0" />
+                          <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 sm:text-sm">
+                            <Clock size={16} className="shrink-0" />
 
-                            <span>
+                            <span className="break-words">
                               {formatTime(routine.startTime)}
                               {" - "}
                               {formatTime(routine.endTime)}
@@ -388,18 +381,18 @@ const RoutineSystem = () => {
                           </div>
 
                           {/* Subject and Class */}
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                              <BookOpen size={21} />
+                          <div className="flex min-w-0 items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                              <BookOpen size={20} />
                             </div>
 
-                            <div className="min-w-0">
-                              <h3 className="break-words font-semibold text-slate-800">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="break-words text-sm font-semibold text-slate-800 sm:text-base">
                                 {routine.subjectId?.subjectName ||
                                   "Subject not available"}
                               </h3>
 
-                              <p className="mt-1 flex flex-wrap items-center gap-1 text-sm text-slate-500">
+                              <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500 sm:text-sm">
                                 <GraduationCap size={15} />
 
                                 <span>
@@ -411,7 +404,7 @@ const RoutineSystem = () => {
                               </p>
 
                               {routine.subjectId?.subjectCode && (
-                                <p className="mt-1 text-xs text-slate-400">
+                                <p className="mt-1 break-words text-xs text-slate-400">
                                   Subject Code:{" "}
                                   {routine.subjectId.subjectCode}
                                 </p>
@@ -420,9 +413,13 @@ const RoutineSystem = () => {
                           </div>
 
                           {/* Status */}
-                          <div className="flex items-center sm:justify-end">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-                              <CalendarCheck size={14} />
+                          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                            <span className="text-xs text-slate-400">
+                              Class Schedule
+                            </span>
+
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700 sm:text-xs">
+                              <CalendarCheck size={13} />
                               Scheduled
                             </span>
                           </div>
@@ -463,6 +460,7 @@ const RoutineSystem = () => {
           )}
         </div>
 
+        {/* Footer */}
         <p className="text-xs text-slate-400">
           Showing {filteredRoutines.length} of {routines.length} scheduled classes.
         </p>
