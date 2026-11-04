@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     BookOpen,
     Users,
@@ -12,9 +12,14 @@ import {
     Layers,
     ArrowUpRight,
     School,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 
 import api from "../../services/api";
+
+const ITEMS_PER_PAGE = 6;
 
 const Class = () => {
     const [classes, setClasses] = useState([]);
@@ -22,6 +27,10 @@ const Class = () => {
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedClass, setSelectedClass] = useState(null);
+
+    const [selectedSection, setSelectedSection] = useState("all");
+    const [selectedYear, setSelectedYear] = useState("all");
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Fetch teacher's assigned classes
     const fetchMyClasses = async () => {
@@ -50,21 +59,87 @@ const Class = () => {
         fetchMyClasses();
     }, []);
 
-    // Search classes
-    const filteredClasses = classes.filter((item) => {
-        const search = searchTerm.toLowerCase();
+    // Available filter options
+    const sections = useMemo(() => {
+        return [
+            ...new Set(
+                classes
+                    .map((item) => item.section)
+                    .filter(Boolean)
+            ),
+        ].sort();
+    }, [classes]);
 
-        return (
-            item.className?.toLowerCase().includes(search) ||
-            item.section?.toLowerCase().includes(search) ||
-            String(item.academicYear || "").includes(search)
-        );
-    });
+    const academicYears = useMemo(() => {
+        return [
+            ...new Set(
+                classes
+                    .map((item) => String(item.academicYear || ""))
+                    .filter(Boolean)
+            ),
+        ].sort((a, b) => b.localeCompare(a));
+    }, [classes]);
+
+    // Search and filter classes
+    const filteredClasses = useMemo(() => {
+        const search = searchTerm.trim().toLowerCase();
+
+        return classes.filter((item) => {
+            const matchesSearch =
+                item.className?.toLowerCase().includes(search) ||
+                item.section?.toLowerCase().includes(search) ||
+                String(item.academicYear || "").toLowerCase().includes(search);
+
+            const matchesSection =
+                selectedSection === "all" ||
+                item.section === selectedSection;
+
+            const matchesYear =
+                selectedYear === "all" ||
+                String(item.academicYear || "") === selectedYear;
+
+            return matchesSearch && matchesSection && matchesYear;
+        });
+    }, [classes, searchTerm, selectedSection, selectedYear]);
+
+    // Reset page when search or filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, selectedSection, selectedYear]);
 
     const totalStudents = classes.reduce(
         (total, item) => total + (Number(item.studentCount) || 0),
         0
     );
+
+    // Pagination
+    const totalPages = Math.ceil(filteredClasses.length / ITEMS_PER_PAGE);
+
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
+    const currentClasses = filteredClasses.slice(
+        startIndex,
+        startIndex + ITEMS_PER_PAGE
+    );
+
+    const showingFrom = filteredClasses.length === 0 ? 0 : startIndex + 1;
+
+    const showingTo = Math.min(
+        startIndex + ITEMS_PER_PAGE,
+        filteredClasses.length
+    );
+
+    const clearFilters = () => {
+        setSearchTerm("");
+        setSelectedSection("all");
+        setSelectedYear("all");
+        setCurrentPage(1);
+    };
+
+    const hasActiveFilters =
+        searchTerm.trim() !== "" ||
+        selectedSection !== "all" ||
+        selectedYear !== "all";
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -90,7 +165,6 @@ const Class = () => {
                     </p>
                 </div>
 
-                {/* Refresh Button */}
                 <button
                     onClick={fetchMyClasses}
                     disabled={loading}
@@ -107,7 +181,6 @@ const Class = () => {
             {/* Summary Cards */}
             <div className="mb-7 grid grid-cols-2 gap-3 sm:gap-5">
 
-                {/* Total Classes */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-5">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -130,7 +203,6 @@ const Class = () => {
                     </div>
                 </div>
 
-                {/* Total Students */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-5">
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -154,35 +226,110 @@ const Class = () => {
                 </div>
             </div>
 
-            {/* Classes Section */}
+            {/* Assigned Classes Section */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
                 {/* Section Header */}
-                <div className="flex flex-col justify-between gap-4 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:p-5">
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800">
-                            Assigned Classes
-                        </h2>
+                <div className="border-b border-slate-100 p-4 sm:p-5">
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800">
+                                Assigned Classes
+                            </h2>
 
-                        <p className="mt-1 text-sm text-slate-500">
-                            All classes assigned to your account.
-                        </p>
+                            <p className="mt-1 text-sm text-slate-500">
+                                Manage and view all classes assigned to your account.
+                            </p>
+                        </div>
+
+                        <div className="inline-flex w-fit items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                            <BookOpen size={15} />
+                            {classes.length} Assigned
+                        </div>
                     </div>
 
-                    {/* Search */}
-                    <div className="relative w-full sm:max-w-xs">
-                        <Search
-                            size={18}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
+                    {/* Search and Filters */}
+                    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
 
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search classes..."
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-                        />
+                        {/* Search */}
+                        <div className="relative sm:col-span-2 xl:col-span-2">
+                            <Search
+                                size={18}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search class, section or year..."
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                            />
+                        </div>
+
+                        {/* Section Filter */}
+                        <div className="relative">
+                            <Filter
+                                size={16}
+                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+
+                            <select
+                                value={selectedSection}
+                                onChange={(e) => setSelectedSection(e.target.value)}
+                                className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                            >
+                                <option value="all">All Sections</option>
+
+                                {sections.map((section) => (
+                                    <option key={section} value={section}>
+                                        Section {section}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Academic Year Filter */}
+                        <div className="relative">
+                            <CalendarDays
+                                size={16}
+                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(e.target.value)}
+                                className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                            >
+                                <option value="all">All Academic Years</option>
+
+                                {academicYears.map((year) => (
+                                    <option key={year} value={year}>
+                                        {year}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Filter Information */}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500">
+                            Showing{" "}
+                            <span className="font-semibold text-slate-700">
+                                {filteredClasses.length}
+                            </span>{" "}
+                            matching classes
+                        </p>
+
+                        {hasActiveFilters && (
+                            <button
+                                onClick={clearFilters}
+                                className="text-xs font-semibold text-blue-600 transition hover:text-blue-800"
+                            >
+                                Clear all filters
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -213,148 +360,195 @@ const Class = () => {
                         </p>
                     </div>
                 ) : filteredClasses.length === 0 ? (
-                    /* Empty State */
                     <div className="px-5 py-16 text-center">
                         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-500">
                             <GraduationCap size={32} />
                         </div>
 
                         <h3 className="mt-4 text-lg font-semibold text-slate-800">
-                            {searchTerm
+                            {hasActiveFilters
                                 ? "No Classes Found"
                                 : "No Classes Assigned Yet"}
                         </h3>
 
                         <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
-                            {searchTerm
-                                ? "Try another class name, section or academic year."
+                            {hasActiveFilters
+                                ? "Try changing your search or filters to find your assigned classes."
                                 : "Your assigned classes will appear here once the administrator assigns them to you."}
                         </p>
+
+                        {hasActiveFilters && (
+                            <button
+                                onClick={clearFilters}
+                                className="mt-4 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            >
+                                Clear Filters
+                            </button>
+                        )}
                     </div>
                 ) : (
-                    /* Class Cards */
-                    <div className="grid grid-cols-1 gap-5 p-4 sm:grid-cols-2 sm:gap-5 sm:p-5 2xl:grid-cols-3">
+                    <>
+                        {/* Class Cards */}
+                        <div className="grid grid-cols-1 gap-5 p-4 sm:grid-cols-2 sm:gap-5 sm:p-5 2xl:grid-cols-3">
 
-                        {filteredClasses.map((item) => (
-                            <div
-                                key={item._id}
-                                className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg"
-                            >
-                                {/* Card Header */}
-                                <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 px-5 py-5 sm:px-5 sm:py-6">
+                            {currentClasses.map((item) => (
+                                <div
+                                    key={item._id}
+                                    className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg"
+                                >
+                                    {/* Card Header */}
+                                    <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 px-5 py-5 sm:py-6">
 
-                                    <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/[0.08]" />
+                                        <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/[0.08]" />
 
-                                    <div className="pointer-events-none absolute -bottom-16 right-20 h-32 w-32 rounded-full bg-white/[0.08]" />
+                                        <div className="pointer-events-none absolute -bottom-16 right-20 h-32 w-32 rounded-full bg-white/[0.08]" />
 
-                                    <div className="relative flex items-center justify-between gap-3">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white shadow-sm">
-                                            <GraduationCap size={24} />
+                                        <div className="relative flex items-center justify-between gap-3">
+                                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-white shadow-sm">
+                                                <GraduationCap size={24} />
+                                            </div>
+
+                                            <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-white">
+                                                Assigned
+                                            </span>
                                         </div>
 
-                                        <span className="rounded-full border border-white/20 bg-white/15 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-white">
-                                            Assigned
-                                        </span>
+                                        <div className="relative mt-5">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-blue-100">
+                                                Class Information
+                                            </p>
+
+                                            <h3 className="mt-1.5 break-words text-2xl font-bold leading-tight text-white sm:text-[26px]">
+                                                {item.className}
+                                            </h3>
+
+                                            <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-blue-50">
+                                                <Layers size={14} />
+                                                Section {item.section || "N/A"}
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div className="relative mt-5">
-                                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-blue-100">
-                                            Class Information
-                                        </p>
+                                    {/* Card Body */}
+                                    <div className="flex flex-1 flex-col p-4 sm:p-5">
 
-                                        <h3 className="mt-1.5 break-words text-2xl font-bold leading-tight text-white sm:text-[26px]">
-                                            {item.className}
-                                        </h3>
+                                        <div className="grid grid-cols-2 gap-3">
 
-                                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-blue-50">
-                                            <Layers size={14} />
-                                            Section {item.section || "N/A"}
+                                            <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
+                                                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                                                    <CalendarDays size={16} />
+                                                </div>
+
+                                                <p className="text-[11px] font-medium text-slate-500 sm:text-xs">
+                                                    Academic Year
+                                                </p>
+
+                                                <p className="mt-1 break-words text-base font-bold text-slate-800 sm:text-lg">
+                                                    {item.academicYear || "N/A"}
+                                                </p>
+                                            </div>
+
+                                            <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
+                                                <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                                    <Users size={16} />
+                                                </div>
+
+                                                <p className="text-[11px] font-medium text-slate-500 sm:text-xs">
+                                                    Total Students
+                                                </p>
+
+                                                <p className="mt-1 text-base font-bold text-slate-800 sm:text-lg">
+                                                    {item.studentCount || 0}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
+                                            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+
+                                            <span className="text-xs font-semibold text-emerald-700">
+                                                Active Assignment
+                                            </span>
+
+                                            <span className="ml-auto text-[10px] font-medium text-emerald-600">
+                                                Assigned
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-auto pt-4">
+                                            <button
+                                                onClick={() => setSelectedClass(item)}
+                                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-blue-700"
+                                            >
+                                                <Eye size={17} />
+                                                View Class Details
+                                                <ArrowUpRight size={16} />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
+                            ))}
+                        </div>
 
-                                {/* Card Body */}
-                                <div className="flex flex-1 flex-col p-4 sm:p-5">
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex flex-col gap-4 border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
 
-                                    {/* Information Boxes */}
-                                    <div className="grid grid-cols-2 gap-3">
+                                <p className="text-xs text-slate-500">
+                                    Showing{" "}
+                                    <span className="font-semibold text-slate-700">
+                                        {showingFrom}-{showingTo}
+                                    </span>{" "}
+                                    of{" "}
+                                    <span className="font-semibold text-slate-700">
+                                        {filteredClasses.length}
+                                    </span>{" "}
+                                    classes
+                                </p>
 
-                                        {/* Academic Year */}
-                                        <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
-                                            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                                                <CalendarDays size={16} />
-                                            </div>
+                                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                                    <button
+                                        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                        disabled={currentPage === 1}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600"
+                                    >
+                                        <ChevronLeft size={16} />
+                                        Previous
+                                    </button>
 
-                                            <p className="text-[11px] font-medium text-slate-500 sm:text-xs">
-                                                Academic Year
-                                            </p>
+                                    <span className="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-bold text-white">
+                                        {currentPage} / {totalPages}
+                                    </span>
 
-                                            <p className="mt-1 break-words text-base font-bold text-slate-800 sm:text-lg">
-                                                {item.academicYear || "N/A"}
-                                            </p>
-                                        </div>
-
-                                        {/* Students */}
-                                        <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
-                                            <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
-                                                <Users size={16} />
-                                            </div>
-
-                                            <p className="text-[11px] font-medium text-slate-500 sm:text-xs">
-                                                Total Students
-                                            </p>
-
-                                            <p className="mt-1 text-base font-bold text-slate-800 sm:text-lg">
-                                                {item.studentCount || 0}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Assignment Status */}
-                                    <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
-                                        <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-
-                                        <span className="text-xs font-semibold text-emerald-700">
-                                            Active Assignment
-                                        </span>
-
-                                        <span className="ml-auto text-[10px] font-medium text-emerald-600">
-                                            Assigned
-                                        </span>
-                                    </div>
-
-                                    {/* View Details Button */}
-                                    <div className="mt-auto pt-4">
-                                        <button
-                                            onClick={() => setSelectedClass(item)}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-blue-700"
-                                        >
-                                            <Eye size={17} />
-                                            View Class Details
-                                            <ArrowUpRight size={16} />
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                        disabled={currentPage === totalPages}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600"
+                                    >
+                                        Next
+                                        <ChevronRight size={16} />
+                                    </button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                )}
+                        )}
 
-                {/* Footer */}
-                {!loading && filteredClasses.length > 0 && (
-                    <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-3">
-                        <p className="text-xs text-slate-500">
-                            Showing{" "}
-                            <span className="font-semibold text-slate-700">
-                                {filteredClasses.length}
-                            </span>{" "}
-                            of{" "}
-                            <span className="font-semibold text-slate-700">
-                                {classes.length}
-                            </span>{" "}
-                            assigned classes
-                        </p>
-                    </div>
+                        {/* Results Footer */}
+                        {totalPages <= 1 && (
+                            <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-3">
+                                <p className="text-xs text-slate-500">
+                                    Showing{" "}
+                                    <span className="font-semibold text-slate-700">
+                                        {filteredClasses.length}
+                                    </span>{" "}
+                                    of{" "}
+                                    <span className="font-semibold text-slate-700">
+                                        {classes.length}
+                                    </span>{" "}
+                                    assigned classes
+                                </p>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -398,7 +592,6 @@ const Class = () => {
                         {/* Modal Body */}
                         <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
 
-                            {/* Class Name */}
                             <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
                                 <p className="text-xs font-medium uppercase tracking-wider text-blue-500">
                                     Class Name
@@ -409,15 +602,12 @@ const Class = () => {
                                 </h3>
                             </div>
 
-                            {/* Class Information */}
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
                                 <div className="rounded-xl border border-slate-100 p-4">
                                     <div className="mb-2 flex items-center gap-2 text-slate-400">
                                         <Layers size={16} />
-                                        <span className="text-xs">
-                                            Section
-                                        </span>
+                                        <span className="text-xs">Section</span>
                                     </div>
 
                                     <p className="break-words font-semibold text-slate-800">
@@ -428,9 +618,7 @@ const Class = () => {
                                 <div className="rounded-xl border border-slate-100 p-4">
                                     <div className="mb-2 flex items-center gap-2 text-slate-400">
                                         <CalendarDays size={16} />
-                                        <span className="text-xs">
-                                            Academic Year
-                                        </span>
+                                        <span className="text-xs">Academic Year</span>
                                     </div>
 
                                     <p className="break-words font-semibold text-slate-800">
@@ -441,9 +629,7 @@ const Class = () => {
                                 <div className="rounded-xl border border-slate-100 p-4 sm:col-span-2">
                                     <div className="mb-2 flex items-center gap-2 text-slate-400">
                                         <Users size={16} />
-                                        <span className="text-xs">
-                                            Total Students
-                                        </span>
+                                        <span className="text-xs">Total Students</span>
                                     </div>
 
                                     <p className="font-semibold text-slate-800">
@@ -452,7 +638,6 @@ const Class = () => {
                                 </div>
                             </div>
 
-                            {/* Assignment Status */}
                             <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
                                 <div className="flex items-center gap-2">
                                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
