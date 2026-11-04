@@ -39,7 +39,7 @@ const Fee = () => {
 
       setFees(feeRecords);
 
-      // Calculate summary
+      // Calculate Summary
       const totalFee = feeRecords.reduce(
         (sum, fee) => sum + Number(fee.totalFee || 0),
         0
@@ -60,7 +60,6 @@ const Fee = () => {
         paidAmount,
         dueAmount,
       });
-
     } catch (err) {
       console.error("Student Fee Error:", err);
 
@@ -76,7 +75,6 @@ const Fee = () => {
         paidAmount: 0,
         dueAmount: 0,
       });
-
     } finally {
       setLoading(false);
     }
@@ -89,6 +87,13 @@ const Fee = () => {
   // Currency Format
   const formatCurrency = (amount) => {
     return `৳ ${Number(amount || 0).toLocaleString("en-BD")}`;
+  };
+
+  // Date Format
+  const formatDate = (date) => {
+    if (!date) return "N/A";
+
+    return new Date(date).toLocaleDateString("en-GB");
   };
 
   // Status Style
@@ -125,69 +130,24 @@ const Fee = () => {
     }
   };
 
-  // Loading Screen
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <RefreshCw
-            className="mx-auto animate-spin text-blue-600"
-            size={35}
-          />
-
-          <p className="mt-3 text-gray-500">
-            Loading fee information...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Error Screen
-  if (error) {
-    return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
-        <AlertCircle
-          className="mx-auto text-red-500"
-          size={40}
-        />
-
-        <h2 className="mt-3 text-lg font-semibold text-red-700">
-          Unable to Load Fees
-        </h2>
-
-        <p className="mt-2 text-sm text-red-600">
-          {error}
-        </p>
-
-        <button
-          onClick={fetchFees}
-          className="mt-5 rounded-lg bg-blue-600 px-5 py-2 text-white transition hover:bg-blue-700"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
   // Summary Cards
   const cards = [
     {
       title: "Total Fee",
       amount: summary.totalFee,
-      icon: <Wallet size={24} />,
+      icon: <Wallet size={23} />,
       color: "bg-blue-100 text-blue-600",
     },
     {
       title: "Paid Amount",
       amount: summary.paidAmount,
-      icon: <CheckCircle size={24} />,
+      icon: <CheckCircle size={23} />,
       color: "bg-green-100 text-green-600",
     },
     {
       title: "Due Amount",
       amount: summary.dueAmount,
-      icon: <CircleDollarSign size={24} />,
+      icon: <CircleDollarSign size={23} />,
       color: "bg-red-100 text-red-600",
     },
   ];
@@ -201,191 +161,280 @@ const Fee = () => {
         )
       : 0;
 
-  return (
-    <div className="space-y-6">
+  // Loading Screen
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] w-full items-center justify-center p-4">
+        <div className="text-center">
+          <RefreshCw
+            className="mx-auto text-blue-600"
+            size={32}
+          />
 
-      {/* Page Header */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">
-            Fee Management
-          </h1>
-
-          <p className="mt-1 text-sm text-gray-500">
-            View your fee records and payment information.
-          </p>
-        </div>
-
-        <button
-          onClick={fetchFees}
-          className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50"
-        >
-          <RefreshCw size={17} />
-          Refresh
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => (
-          <div
-            key={card.title}
-            className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  {card.title}
-                </p>
-
-                <h2 className="mt-2 text-2xl font-bold text-gray-800">
-                  {formatCurrency(card.amount)}
-                </h2>
-              </div>
-
-              <div className={`rounded-xl p-3 ${card.color}`}>
-                {card.icon}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Payment Information */}
-      <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-white/20 p-3">
-            <CreditCard size={25} />
-          </div>
-
-          <div>
-            <h2 className="text-lg font-semibold">
-              Payment Overview
-            </h2>
-
-            <p className="text-sm text-blue-100">
-              Your overall fee payment information
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <div className="mb-2 flex justify-between text-sm">
-            <span>Payment Progress</span>
-
-            <span>
-              {Math.round(paymentPercentage)}%
-            </span>
-          </div>
-
-          <div className="h-3 overflow-hidden rounded-full bg-white/25">
-            <div
-              className="h-full rounded-full bg-white transition-all duration-500"
-              style={{
-                width: `${paymentPercentage}%`,
-              }}
-            />
-          </div>
-
-          <p className="mt-3 text-sm text-blue-100">
-            {formatCurrency(summary.paidAmount)} paid out of{" "}
-            {formatCurrency(summary.totalFee)}
+          <p className="mt-3 text-sm text-gray-500">
+            Loading fee information...
           </p>
         </div>
       </div>
+    );
+  }
 
-      {/* Fee Records */}
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+  // Error Screen
+  if (error) {
+    return (
+      <div className="flex min-h-[50vh] w-full items-center justify-center p-3 sm:p-5">
+        <div className="w-full max-w-lg rounded-xl border border-red-200 bg-red-50 p-5 text-center sm:p-8">
+          <AlertCircle
+            className="mx-auto text-red-500"
+            size={38}
+          />
 
-        <div className="border-b border-gray-100 p-5">
-          <h2 className="text-lg font-semibold text-gray-800">
-            My Fee Records
+          <h2 className="mt-3 text-lg font-semibold text-red-700">
+            Unable to Load Fees
           </h2>
 
-          <p className="mt-1 text-sm text-gray-500">
-            Total {fees.length} fee record(s)
+          <p className="mt-2 break-words text-sm text-red-600">
+            {error}
           </p>
+
+          <button
+            onClick={fetchFees}
+            className="mt-5 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
+          >
+            Try Again
+          </button>
         </div>
+      </div>
+    );
+  }
 
-        {fees.length === 0 ? (
-          <div className="p-10 text-center">
-            <Receipt
-              className="mx-auto text-gray-300"
-              size={45}
-            />
+  return (
+    <div className="min-h-screen w-full min-w-0 bg-gray-50 p-3 sm:p-5 lg:p-8">
+      <div className="mx-auto w-full max-w-7xl space-y-5 sm:space-y-7">
 
-            <h3 className="mt-3 font-semibold text-gray-700">
-              No Fee Records Found
-            </h3>
+        {/* Page Header */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-gray-800 sm:text-2xl lg:text-3xl">
+              Fee Management
+            </h1>
 
-            <p className="mt-1 text-sm text-gray-500">
-              Your fee information has not been added yet.
+            <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+              View your fee records and payment information.
             </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px] text-left">
 
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-5 py-4">SL</th>
-                  <th className="px-5 py-4">Date</th>
-                  <th className="px-5 py-4">Total Fee</th>
-                  <th className="px-5 py-4">Paid Amount</th>
-                  <th className="px-5 py-4">Due Amount</th>
-                  <th className="px-5 py-4">Status</th>
-                </tr>
-              </thead>
+          <button
+            onClick={fetchFees}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <RefreshCw size={17} />
+            Refresh
+          </button>
+        </div>
 
-              <tbody className="divide-y divide-gray-100">
-                {fees.map((fee, index) => (
-                  <tr
-                    key={fee._id}
-                    className="transition hover:bg-gray-50"
-                  >
-                    <td className="px-5 py-4 text-sm text-gray-600">
-                      {index + 1}
-                    </td>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-3">
+          {cards.map((card) => (
+            <div
+              key={card.title}
+              className="min-w-0 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition hover:shadow-md sm:p-5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="break-words text-xs font-medium text-gray-500 sm:text-sm">
+                    {card.title}
+                  </p>
 
-                    <td className="px-5 py-4 text-sm text-gray-600">
-                      {fee.createdAt
-                        ? new Date(
-                            fee.createdAt
-                          ).toLocaleDateString("en-GB")
-                        : "N/A"}
-                    </td>
+                  <h2 className="mt-2 break-words text-lg font-bold text-gray-800 sm:text-2xl">
+                    {formatCurrency(card.amount)}
+                  </h2>
+                </div>
 
-                    <td className="px-5 py-4 text-sm font-medium text-gray-800">
-                      {formatCurrency(fee.totalFee)}
-                    </td>
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-12 sm:w-12 sm:rounded-xl ${card.color}`}
+                >
+                  <span className="sm:hidden">
+                    {card.title === "Total Fee" && <Wallet size={19} />}
+                    {card.title === "Paid Amount" && <CheckCircle size={19} />}
+                    {card.title === "Due Amount" && <CircleDollarSign size={19} />}
+                  </span>
 
-                    <td className="px-5 py-4 text-sm font-medium text-green-600">
-                      {formatCurrency(fee.paidAmount)}
-                    </td>
+                  <span className="hidden sm:block">
+                    {card.icon}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
-                    <td className="px-5 py-4 text-sm font-medium text-red-600">
-                      {formatCurrency(fee.dueAmount)}
-                    </td>
+        {/* Payment Information */}
+        <div className="overflow-hidden rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white shadow-md sm:p-6">
+          <div className="flex items-center gap-3">
+            <div className="shrink-0 rounded-xl bg-white/20 p-2.5 sm:p-3">
+              <CreditCard size={23} />
+            </div>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusStyle(
-                          fee.status
-                        )}`}
-                      >
-                        {getStatusIcon(fee.status)}
-                        {fee.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold sm:text-lg">
+                Payment Overview
+              </h2>
 
-            </table>
+              <p className="text-xs text-blue-100 sm:text-sm">
+                Your overall fee payment information
+              </p>
+            </div>
           </div>
-        )}
-      </div>
 
+          <div className="mt-6">
+            <div className="mb-2 flex items-center justify-between gap-2 text-sm">
+              <span>Payment Progress</span>
+
+              <span className="font-semibold">
+                {Math.round(paymentPercentage)}%
+              </span>
+            </div>
+
+            <div className="h-3 w-full overflow-hidden rounded-full bg-white/25">
+              <div
+                className="h-full rounded-full bg-white"
+                style={{
+                  width: `${paymentPercentage}%`,
+                }}
+              />
+            </div>
+
+            <p className="mt-3 break-words text-xs text-blue-100 sm:text-sm">
+              {formatCurrency(summary.paidAmount)} paid out of{" "}
+              {formatCurrency(summary.totalFee)}
+            </p>
+          </div>
+        </div>
+
+        {/* Fee Records */}
+        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+
+          {/* Section Header */}
+          <div className="border-b border-gray-100 p-4 sm:p-6">
+            <h2 className="text-base font-semibold text-gray-800 sm:text-lg">
+              My Fee Records
+            </h2>
+
+            <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+              Total {fees.length} fee record(s)
+            </p>
+          </div>
+
+          {/* Empty State */}
+          {fees.length === 0 ? (
+            <div className="p-8 text-center sm:p-10">
+              <Receipt
+                className="mx-auto text-gray-300"
+                size={42}
+              />
+
+              <h3 className="mt-3 font-semibold text-gray-700">
+                No Fee Records Found
+              </h3>
+
+              <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+                Your fee information has not been added yet.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Fee Table */}
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[650px] text-left text-sm">
+                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                    <tr>
+                      <th className="whitespace-nowrap px-5 py-4 font-semibold">
+                        SL
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4 font-semibold">
+                        Date
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4 font-semibold">
+                        Total Fee
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4 font-semibold">
+                        Paid Amount
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4 font-semibold">
+                        Due Amount
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4 font-semibold">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-gray-100">
+                    {fees.map((fee, index) => (
+                      <tr
+                        key={fee._id || index}
+                        className="transition hover:bg-gray-50"
+                      >
+                        <td className="px-5 py-4 text-gray-600">
+                          {index + 1}
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 text-gray-600">
+                          {formatDate(fee.createdAt)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-800">
+                          {formatCurrency(fee.totalFee)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 font-medium text-green-600">
+                          {formatCurrency(fee.paidAmount)}
+                        </td>
+
+                        <td className="whitespace-nowrap px-5 py-4 font-medium text-red-600">
+                          {formatCurrency(fee.dueAmount)}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusStyle(
+                              fee.status
+                            )}`}
+                          >
+                            {getStatusIcon(fee.status)}
+                            {fee.status || "N/A"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Table Footer */}
+              <div className="flex flex-col gap-2 border-t border-gray-100 px-4 py-4 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:text-sm">
+                <p>
+                  Showing {fees.length} fee record(s)
+                </p>
+
+                <p>
+                  Total Due:{" "}
+                  <span className="font-semibold text-red-600">
+                    {formatCurrency(summary.dueAmount)}
+                  </span>
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
