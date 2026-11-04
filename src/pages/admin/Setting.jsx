@@ -56,8 +56,8 @@ export default function SettingsManagement() {
   const [messageType, setMessageType] = useState("success");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
-  // Load settings from MongoDB
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -85,6 +85,8 @@ export default function SettingsManagement() {
         adminName: admin.name || "",
         adminEmail: admin.email || "",
       });
+
+      setLogoError(false);
     } catch (error) {
       setMessage(
         error.response?.data?.message ||
@@ -108,10 +110,13 @@ export default function SettingsManagement() {
       [name]: value,
     }));
 
+    if (name === "schoolLogo") {
+      setLogoError(false);
+    }
+
     setMessage("");
   };
 
-  // Save settings according to active section
   const handleSave = async (e) => {
     e.preventDefault();
 
@@ -129,7 +134,6 @@ export default function SettingsManagement() {
         };
 
         await api.put("/settings/update-setting", payload);
-
         setMessage("School information saved successfully.");
       } else if (activeTab === "academic") {
         const payload = {
@@ -139,7 +143,6 @@ export default function SettingsManagement() {
         };
 
         await api.put("/settings/update-setting", payload);
-
         setMessage("Academic settings saved successfully.");
       } else if (activeTab === "general") {
         const payload = {
@@ -149,7 +152,6 @@ export default function SettingsManagement() {
         };
 
         await api.put("/settings/update-setting", payload);
-
         setMessage("General settings saved successfully.");
       } else if (activeTab === "profile") {
         const payload = {
@@ -158,7 +160,6 @@ export default function SettingsManagement() {
         };
 
         const response = await api.put("/settings/profile", payload);
-
         const admin = response.data?.data || {};
 
         setSettings((prev) => ({
@@ -225,7 +226,6 @@ export default function SettingsManagement() {
     }
   };
 
-  // Reset current form using saved database values
   const handleReset = () => {
     if (activeTab === "password") {
       setSettings((prev) => ({
@@ -244,13 +244,19 @@ export default function SettingsManagement() {
   };
 
   const inputClass =
-    "w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 sm:px-4";
+    "w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
   const labelClass =
-    "mb-2 block text-xs font-semibold text-slate-700 sm:text-sm";
+    "mb-2 block text-sm font-semibold text-slate-700";
 
-  const renderInput = (label, name, placeholder, Icon, type = "text") => (
-    <div className="min-w-0">
+  const renderInput = (
+    label,
+    name,
+    placeholder,
+    Icon,
+    type = "text"
+  ) => (
+    <div className="w-full min-w-0">
       <label htmlFor={name} className={labelClass}>
         {label}
       </label>
@@ -258,7 +264,7 @@ export default function SettingsManagement() {
       <div className="relative">
         <Icon
           size={17}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
         />
 
         <input
@@ -268,14 +274,14 @@ export default function SettingsManagement() {
           value={settings[name]}
           onChange={handleChange}
           placeholder={placeholder}
-          className={`${inputClass} pl-10`}
+          className={`${inputClass} pl-11`}
         />
       </div>
     </div>
   );
 
   const renderSelect = (label, name, options) => (
-    <div className="min-w-0">
+    <div className="w-full min-w-0">
       <label htmlFor={name} className={labelClass}>
         {label}
       </label>
@@ -300,71 +306,110 @@ export default function SettingsManagement() {
     switch (activeTab) {
       case "school":
         return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            {renderInput(
-              "School Name",
-              "schoolName",
-              "Enter school name",
-              School
-            )}
+          <div className="space-y-7">
+            {/* School Details */}
+            <div>
+              <div className="mb-5">
+                <h3 className="text-sm font-bold text-slate-800">
+                  School Details
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Update your school's basic contact information.
+                </p>
+              </div>
 
-            {renderInput(
-              "School Email",
-              "schoolEmail",
-              "Enter school email",
-              Mail
-            )}
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {renderInput(
+                  "School Name",
+                  "schoolName",
+                  "Enter school name",
+                  School
+                )}
 
-            {renderInput(
-              "Phone Number",
-              "schoolPhone",
-              "Enter phone number",
-              Phone
-            )}
+                {renderInput(
+                  "School Email",
+                  "schoolEmail",
+                  "Enter school email",
+                  Mail
+                )}
 
-            {renderInput(
-              "School Address",
-              "schoolAddress",
-              "Enter school address",
-              MapPin
-            )}
+                {renderInput(
+                  "Phone Number",
+                  "schoolPhone",
+                  "Enter phone number",
+                  Phone
+                )}
 
-            <div className="min-w-0 sm:col-span-2">
-              <label className={labelClass}>School Logo URL</label>
+                {renderInput(
+                  "School Address",
+                  "schoolAddress",
+                  "Enter school address",
+                  MapPin
+                )}
+              </div>
+            </div>
 
-              <div className="flex min-w-0 flex-col gap-4 rounded-xl border border-dashed border-slate-300 p-3 sm:flex-row sm:items-center sm:p-5">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-50 text-blue-600">
-                  {settings.schoolLogo ? (
-                    <img
-                      src={settings.schoolLogo}
-                      alt="School Logo"
-                      className="h-full w-full object-contain"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <Image size={30} />
-                  )}
+            {/* School Logo */}
+            <div className="border-t border-slate-100 pt-6">
+              <div className="mb-5">
+                <h3 className="text-sm font-bold text-slate-800">
+                  School Logo
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Add or update your school's logo image.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-[150px_minmax(0,1fr)] md:items-start">
+                {/* Logo Preview */}
+                <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    {settings.schoolLogo && !logoError ? (
+                      <img
+                        src={settings.schoolLogo}
+                        alt="School Logo"
+                        className="h-full w-full object-contain p-2"
+                        onError={() => setLogoError(true)}
+                      />
+                    ) : (
+                      <Image size={34} className="text-blue-500" />
+                    )}
+                  </div>
+
+                  <span className="text-xs font-semibold text-slate-600">
+                    Logo Preview
+                  </span>
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-700">
-                    School Logo
-                  </p>
+                {/* Logo URL Input */}
+                <div className="min-w-0">
+                  <label
+                    htmlFor="schoolLogo"
+                    className={labelClass}
+                  >
+                    School Logo URL
+                  </label>
 
                   <input
+                    id="schoolLogo"
                     type="url"
                     name="schoolLogo"
                     value={settings.schoolLogo}
                     onChange={handleChange}
-                    placeholder="Enter school logo image URL"
-                    className={`${inputClass} mt-2`}
+                    placeholder="https://example.com/school-logo.png"
+                    className={inputClass}
                   />
 
-                  <p className="mt-1.5 text-xs leading-5 text-slate-400">
-                    Provide an image URL. Direct file upload is not configured yet.
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Paste a valid image URL to display your school logo.
+                    Direct file upload is not configured yet.
                   </p>
+
+                  {logoError && settings.schoolLogo && (
+                    <p className="mt-2 text-xs text-red-500">
+                      Unable to load this image. Please check the URL.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -373,7 +418,7 @@ export default function SettingsManagement() {
 
       case "academic":
         return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             {renderInput(
               "Academic Year",
               "academicYear",
@@ -398,7 +443,7 @@ export default function SettingsManagement() {
 
       case "general":
         return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             {renderSelect("Language", "language", [
               { value: "English", label: "English" },
               { value: "Bangla", label: "Bangla" },
@@ -422,7 +467,7 @@ export default function SettingsManagement() {
 
       case "profile":
         return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             {renderInput(
               "Admin Name",
               "adminName",
@@ -441,34 +486,36 @@ export default function SettingsManagement() {
 
       case "password":
         return (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            {renderInput(
-              "Current Password",
-              "currentPassword",
-              "Enter current password",
-              Lock,
-              "password"
-            )}
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              {renderInput(
+                "Current Password",
+                "currentPassword",
+                "Enter current password",
+                Lock,
+                "password"
+              )}
 
-            {renderInput(
-              "New Password",
-              "newPassword",
-              "Enter new password",
-              Lock,
-              "password"
-            )}
+              {renderInput(
+                "New Password",
+                "newPassword",
+                "Enter new password",
+                Lock,
+                "password"
+              )}
 
-            {renderInput(
-              "Confirm New Password",
-              "confirmPassword",
-              "Confirm new password",
-              Lock,
-              "password"
-            )}
+              {renderInput(
+                "Confirm New Password",
+                "confirmPassword",
+                "Confirm new password",
+                Lock,
+                "password"
+              )}
+            </div>
 
-            <div className="flex min-w-0 items-center gap-3 rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-700 sm:p-4 sm:text-sm">
-              <ShieldCheck size={24} className="shrink-0" />
-              <p>
+            <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
+              <ShieldCheck size={22} className="shrink-0" />
+              <p className="leading-6">
                 Use a strong password with at least 8 characters.
               </p>
             </div>
@@ -501,12 +548,11 @@ export default function SettingsManagement() {
   }
 
   return (
-    <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-8">
+    <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-7">
       <div className="mx-auto w-full max-w-7xl min-w-0">
-
         {/* Header */}
-        <div className="mb-5 flex items-center gap-3 sm:mb-6">
-          <div className="shrink-0 rounded-xl bg-blue-100 p-2.5 text-blue-600 sm:p-3">
+        <div className="mb-6 flex items-start gap-3 sm:items-center">
+          <div className="shrink-0 rounded-xl bg-blue-100 p-3 text-blue-600">
             <Settings size={23} />
           </div>
 
@@ -515,50 +561,61 @@ export default function SettingsManagement() {
               Settings Management
             </h1>
 
-            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+            <p className="mt-1 text-xs leading-5 text-slate-500 sm:text-sm">
               Manage your school system preferences and configurations.
             </p>
           </div>
         </div>
 
         {/* Info Cards */}
-        <div className="mb-5 grid grid-cols-3 gap-2 sm:mb-6 sm:gap-4">
-          <div className="min-w-0 rounded-xl border border-slate-100 bg-white p-2.5 shadow-sm sm:p-5">
-            <School size={20} className="mb-2 text-blue-600 sm:mb-3 sm:h-6 sm:w-6" />
-            <p className="truncate text-[10px] text-slate-500 sm:text-sm">
-              School Configuration
-            </p>
-            <h3 className="mt-1 text-[11px] font-semibold text-slate-800 sm:text-base">
-              School Details
-            </h3>
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="shrink-0 rounded-lg bg-blue-50 p-2.5 text-blue-600">
+              <School size={22} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">
+                School Configuration
+              </p>
+              <h3 className="mt-1 text-sm font-semibold text-slate-800">
+                School Details
+              </h3>
+            </div>
           </div>
 
-          <div className="min-w-0 rounded-xl border border-slate-100 bg-white p-2.5 shadow-sm sm:p-5">
-            <GraduationCap size={20} className="mb-2 text-emerald-600 sm:mb-3 sm:h-6 sm:w-6" />
-            <p className="truncate text-[10px] text-slate-500 sm:text-sm">
-              Academic Management
-            </p>
-            <h3 className="mt-1 text-[11px] font-semibold text-slate-800 sm:text-base">
-              Academic Session
-            </h3>
+          <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="shrink-0 rounded-lg bg-emerald-50 p-2.5 text-emerald-600">
+              <GraduationCap size={22} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">
+                Academic Management
+              </p>
+              <h3 className="mt-1 text-sm font-semibold text-slate-800">
+                Academic Session
+              </h3>
+            </div>
           </div>
 
-          <div className="min-w-0 rounded-xl border border-slate-100 bg-white p-2.5 shadow-sm sm:p-5">
-            <ShieldCheck size={20} className="mb-2 text-violet-600 sm:mb-3 sm:h-6 sm:w-6" />
-            <p className="truncate text-[10px] text-slate-500 sm:text-sm">
-              Account Security
-            </p>
-            <h3 className="mt-1 text-[11px] font-semibold text-slate-800 sm:text-base">
-              Admin Settings
-            </h3>
+          <div className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="shrink-0 rounded-lg bg-violet-50 p-2.5 text-violet-600">
+              <ShieldCheck size={22} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500">
+                Account Security
+              </p>
+              <h3 className="mt-1 text-sm font-semibold text-slate-800">
+                Admin Settings
+              </h3>
+            </div>
           </div>
         </div>
 
         {/* Settings Layout */}
-        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-4 lg:gap-6">
-
-          {/* Sidebar / Mobile Tabs */}
-          <aside className="min-w-0 overflow-hidden rounded-xl border border-slate-100 bg-white p-2 shadow-sm sm:p-3">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]">
+          {/* Sidebar */}
+          <aside className="min-w-0 rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
             <h2 className="hidden px-3 py-3 text-xs font-bold tracking-wide text-slate-400 lg:block">
               SETTINGS MENU
             </h2>
@@ -576,14 +633,14 @@ export default function SettingsManagement() {
                       setActiveTab(section.id);
                       setMessage("");
                     }}
-                    className={`flex shrink-0 items-center justify-center gap-2 rounded-lg px-3 py-3 text-xs font-semibold transition sm:text-sm lg:w-full lg:justify-start ${
+                    className={`flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-3 text-xs font-semibold transition sm:text-sm lg:w-full ${
                       isActive
                         ? "bg-blue-50 text-blue-700"
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <Icon size={17} className="shrink-0" />
-                    <span className="whitespace-nowrap">
+                    <Icon size={18} className="shrink-0" />
+                    <span className="whitespace-nowrap lg:whitespace-normal lg:text-left">
                       {section.label}
                     </span>
                   </button>
@@ -593,25 +650,25 @@ export default function SettingsManagement() {
           </aside>
 
           {/* Main Form */}
-          <main className="min-w-0 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm lg:col-span-3">
-            <div className="border-b border-slate-100 p-4 sm:p-6">
+          <main className="min-w-0 rounded-xl border border-slate-100 bg-white shadow-sm">
+            <div className="border-b border-slate-100 px-4 py-5 sm:px-6">
               <h2 className="text-base font-bold text-slate-900 sm:text-lg">
                 {activeSection?.label}
               </h2>
 
-              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+              <p className="mt-1 text-xs leading-5 text-slate-500 sm:text-sm">
                 Update your {activeSection?.label.toLowerCase()} information.
               </p>
             </div>
 
-            <form onSubmit={handleSave} className="p-4 sm:p-6">
+            <form onSubmit={handleSave} className="p-4 sm:p-6 lg:p-7">
               {renderSection()}
 
               {/* Message */}
               {message && (
                 <div
                   role={messageType === "success" ? "status" : "alert"}
-                  className={`mt-5 flex items-start gap-2 rounded-xl p-3 text-xs sm:text-sm ${
+                  className={`mt-6 flex items-start gap-2 rounded-xl p-3 text-xs sm:text-sm ${
                     messageType === "success"
                       ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
                       : "border border-red-200 bg-red-50 text-red-700"
@@ -627,7 +684,7 @@ export default function SettingsManagement() {
               )}
 
               {/* Action Buttons */}
-              <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-5 sm:mt-8 sm:flex-row sm:justify-end sm:gap-3">
+              <div className="mt-7 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={handleReset}
