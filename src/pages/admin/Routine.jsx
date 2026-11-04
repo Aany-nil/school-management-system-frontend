@@ -1,5 +1,16 @@
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  Plus,
+  RefreshCw,
+  X,
+  CalendarDays,
+  CheckCircle,
+  AlertCircle,
+  Pencil,
+  Trash2,
+  Clock,
+} from "lucide-react";
 import api from "../../services/api";
 
 const DAYS = [
@@ -49,7 +60,6 @@ function getId(value) {
   if (value && typeof value === "object") {
     return value._id || value.id || "";
   }
-
   return value || "";
 }
 
@@ -82,7 +92,6 @@ function getTeacherLabel(item) {
 
 function formatDay(day) {
   if (!day) return "—";
-
   return day.charAt(0).toUpperCase() + day.slice(1).toLowerCase();
 }
 
@@ -110,6 +119,38 @@ function formatTime(time) {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
+function SummaryCard({ title, value, description, icon, color }) {
+  const colors = {
+    blue: "bg-blue-50 text-blue-600",
+    green: "bg-emerald-50 text-emerald-600",
+  };
+
+  return (
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium text-slate-500 sm:text-sm">
+            {title}
+          </p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+            {value}
+          </h2>
+          <p className="mt-1 text-[10px] text-slate-400 sm:text-xs">
+            {description}
+          </p>
+        </div>
+
+        <div className={`shrink-0 rounded-lg p-2 sm:rounded-xl sm:p-3 ${colors[color]}`}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputClass =
+  "w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
+
 export default function Routine() {
   const [routines, setRoutines] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -127,9 +168,8 @@ export default function Routine() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Read role from common localStorage user objects.
   const [role] = useState(() => {
-    const keys = ["user", "school_user", "sms_user"];
+    const keys = ["user", "tasmina_user", "school_user", "sms_user"];
 
     for (const key of keys) {
       try {
@@ -144,7 +184,7 @@ export default function Routine() {
       }
     }
 
-    return "";
+    return String(localStorage.getItem("role") || "").toLowerCase();
   });
 
   const isAdmin = role === "admin";
@@ -154,10 +194,10 @@ export default function Routine() {
     setError("");
 
     try {
-      // GET /api/v1/routine/all
       const response = await api.get("/routine/all");
       setRoutines(getArray(response));
     } catch (err) {
+      setRoutines([]);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
@@ -211,6 +251,7 @@ export default function Routine() {
     setForm(INITIAL_FORM);
     setEditingId(null);
     setShowForm(false);
+    setError("");
   };
 
   const openCreateForm = () => {
@@ -282,21 +323,17 @@ export default function Routine() {
 
     try {
       if (editingId) {
-        // PATCH /api/v1/routine/routine-update/:id
-        await api.patch(
-          `/routine/routine-update/${editingId}`,
-          payload
-        );
-
+        await api.patch(`/routine/routine-update/${editingId}`, payload);
         setSuccess("Routine updated successfully.");
       } else {
-        // POST /api/v1/routine/create
         await api.post("/routine/create", payload);
-
         setSuccess("Routine created successfully.");
       }
 
-      resetForm();
+      setForm(INITIAL_FORM);
+      setEditingId(null);
+      setShowForm(false);
+
       await fetchRoutines();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -319,9 +356,7 @@ export default function Routine() {
     setDeletingId(routineId);
 
     try {
-      // DELETE /api/v1/routine/routine-delete/:id
       await api.delete(`/routine/routine-delete/${routineId}`);
-
       setSuccess("Routine deleted successfully.");
       await fetchRoutines();
     } catch (err) {
@@ -335,13 +370,18 @@ export default function Routine() {
     routines.map((routine) => String(routine.day || "").toLowerCase())
   ).size;
 
+  const refreshAll = () => {
+    fetchRoutines();
+    fetchOptions();
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Page header */}
-        <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-blue-600">
+    <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-8">
+      <div className="mx-auto w-full max-w-7xl min-w-0">
+        {/* Page Header */}
+        <div className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-center">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-blue-600 sm:text-sm">
               <span className="h-2 w-2 rounded-full bg-blue-600" />
               School Management System
             </div>
@@ -350,33 +390,22 @@ export default function Routine() {
               Routine Management
             </h1>
 
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 sm:mt-2 sm:text-sm">
               View and manage your school class schedule.
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
             <button
               type="button"
-              onClick={() => {
-                fetchRoutines();
-                fetchOptions();
-              }}
+              onClick={refreshAll}
               disabled={loading}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60 sm:px-4 sm:text-sm"
             >
-              <svg
-                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                aria-hidden="true"
-              >
-                <path d="M20 7v5h-5" />
-                <path d="M4 17v-5h5" />
-                <path d="M5.6 9A7 7 0 0 1 18 5l2 2M4 17l2 2a7 7 0 0 0 12.4-2" />
-              </svg>
+              <RefreshCw
+                size={16}
+                className={loading ? "animate-spin" : ""}
+              />
               Refresh
             </button>
 
@@ -384,339 +413,63 @@ export default function Routine() {
               <button
                 type="button"
                 onClick={openCreateForm}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:px-5 sm:text-sm"
               >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  aria-hidden="true"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
+                <Plus size={17} />
                 Add Routine
               </button>
             )}
           </div>
         </div>
 
-        {/* Alerts */}
-        {error && (
+        {/* Page Alerts */}
+        {error && !showForm && (
           <div
             role="alert"
-            className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+            className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:p-4"
           >
-            <span className="font-bold">!</span>
-            <p>{error}</p>
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p className="break-words">{error}</p>
           </div>
         )}
 
         {success && (
           <div
             role="status"
-            className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700"
+            className="mb-5 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 sm:p-4"
           >
-            <span className="font-bold">✓</span>
+            <CheckCircle size={18} className="mt-0.5 shrink-0" />
             <p>{success}</p>
           </div>
         )}
 
-        {/* Summary cards */}
-        <div className="mb-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Total Routines
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {routines.length}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Scheduled class sessions
-                </p>
-              </div>
+        {/* Summary Cards */}
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-5">
+          <SummaryCard
+            title="Total Routines"
+            value={routines.length}
+            description="Scheduled class sessions"
+            icon={<CalendarDays size={22} />}
+            color="blue"
+          />
 
-              <div className="rounded-2xl bg-blue-50 p-4 text-blue-600">
-                <svg
-                  className="h-7 w-7"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path d="M16 3v4M8 3v4M3 10h18M8 14h3M8 17h6" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Available Days
-                </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
-                  {availableDays}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  Days with scheduled classes
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-emerald-50 p-4 text-emerald-600">
-                <svg
-                  className="h-7 w-7"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path d="M16 3v4M8 3v4M3 10h18" />
-                  <path d="m8 15 2 2 5-4" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <SummaryCard
+            title="Available Days"
+            value={availableDays}
+            description="Days with scheduled classes"
+            icon={<CheckCircle size={22} />}
+            color="green"
+          />
         </div>
 
-        {/* Create/Edit form */}
-        {showForm && isAdmin && (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-4 sm:px-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">
-                  {editingId ? "Edit Routine" : "Create Routine"}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Fill in the details for the class schedule.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={resetForm}
-                disabled={saving}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 disabled:opacity-50"
-                aria-label="Close form"
-              >
-                <svg
-                  className="h-5 w-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  aria-hidden="true"
-                >
-                  <path d="m18 6-12 12M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-5 sm:p-6">
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label
-                    htmlFor="classId"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Class <span className="text-red-500">*</span>
-                  </label>
-
-                  <select
-                    id="classId"
-                    name="classId"
-                    value={form.classId}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="">Select class</option>
-                    {classes.map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {getClassLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-
-                  {classes.length === 0 && (
-                    <p className="mt-1.5 text-xs text-amber-600">
-                      No classes loaded. Refresh or check the API response.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="subjectId"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Subject <span className="text-red-500">*</span>
-                  </label>
-
-                  <select
-                    id="subjectId"
-                    name="subjectId"
-                    value={form.subjectId}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="">Select subject</option>
-                    {subjects.map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {getSubjectLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-
-                  {subjects.length === 0 && (
-                    <p className="mt-1.5 text-xs text-amber-600">
-                      No subjects loaded. Refresh or check the API response.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="teacherId"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Teacher <span className="text-red-500">*</span>
-                  </label>
-
-                  <select
-                    id="teacherId"
-                    name="teacherId"
-                    value={form.teacherId}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  >
-                    <option value="">Select teacher</option>
-                    {teachers.map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {getTeacherLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-
-                  {teachers.length === 0 && (
-                    <p className="mt-1.5 text-xs text-amber-600">
-                      No teachers loaded. Refresh or check the API response.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="day"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Day <span className="text-red-500">*</span>
-                  </label>
-
-                  <select
-                    id="day"
-                    name="day"
-                    value={form.day}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  >
-                    {DAYS.map((day) => (
-                      <option key={day.value} value={day.value}>
-                        {day.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="startTime"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    Start Time <span className="text-red-500">*</span>
-                  </label>
-
-                  <input
-                    id="startTime"
-                    name="startTime"
-                    type="time"
-                    value={form.startTime}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="endTime"
-                    className="mb-2 block text-sm font-semibold text-slate-700"
-                  >
-                    End Time <span className="text-red-500">*</span>
-                  </label>
-
-                  <input
-                    id="endTime"
-                    name="endTime"
-                    type="time"
-                    value={form.endTime}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-7 flex flex-wrap gap-3 border-t border-slate-100 pt-5">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                      Saving...
-                    </>
-                  ) : editingId ? (
-                    "Update Routine"
-                  ) : (
-                    "Create Routine"
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  disabled={saving}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </section>
-        )}
-
-        {/* Schedule table */}
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:px-6">
+        {/* Routine Table */}
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:px-6 sm:py-5">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
+              <h2 className="text-base font-bold text-slate-900 sm:text-lg">
                 Class Schedule
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 {routines.length} schedule{routines.length === 1 ? "" : "s"} found
               </p>
             </div>
@@ -728,7 +481,7 @@ export default function Routine() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center px-5 py-16">
-              <div className="h-9 w-9 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+              <RefreshCw size={32} className="animate-spin text-blue-600" />
               <p className="mt-4 text-sm text-slate-500">
                 Loading routines...
               </p>
@@ -736,17 +489,7 @@ export default function Routine() {
           ) : routines.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
               <div className="mb-4 rounded-2xl bg-slate-100 p-4 text-slate-400">
-                <svg
-                  className="h-10 w-10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path d="M16 3v4M8 3v4M3 10h18" />
-                </svg>
+                <CalendarDays size={36} />
               </div>
 
               <h3 className="text-base font-bold text-slate-800">
@@ -763,26 +506,27 @@ export default function Routine() {
                 <button
                   type="button"
                   onClick={openCreateForm}
-                  className="mt-5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
                 >
-                  + Add First Routine
+                  <Plus size={16} />
+                  Add First Routine
                 </button>
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[850px] text-left text-sm">
                 <thead>
                   <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-                    <th className="px-5 py-4 font-semibold">#</th>
-                    <th className="px-5 py-4 font-semibold">Class</th>
-                    <th className="px-5 py-4 font-semibold">Subject</th>
-                    <th className="px-5 py-4 font-semibold">Teacher</th>
-                    <th className="px-5 py-4 font-semibold">Day</th>
-                    <th className="px-5 py-4 font-semibold">Start Time</th>
-                    <th className="px-5 py-4 font-semibold">End Time</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">#</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">Class</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">Subject</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">Teacher</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">Day</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">Start Time</th>
+                    <th className="px-4 py-4 font-semibold sm:px-5">End Time</th>
                     {isAdmin && (
-                      <th className="px-5 py-4 font-semibold">Actions</th>
+                      <th className="px-4 py-4 font-semibold sm:px-5">Actions</th>
                     )}
                   </tr>
                 </thead>
@@ -793,60 +537,69 @@ export default function Routine() {
                       key={routine._id || index}
                       className="transition hover:bg-blue-50/40"
                     >
-                      <td className="px-5 py-4 text-slate-400">
+                      <td className="px-4 py-4 text-slate-400 sm:px-5">
                         {String(index + 1).padStart(2, "0")}
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4 sm:px-5">
                         <div className="font-semibold text-slate-800">
                           {getClassLabel(routine.classId)}
                         </div>
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4 sm:px-5">
                         <div className="font-medium text-slate-800">
                           {getSubjectLabel(routine.subjectId)}
                         </div>
                       </td>
 
-                      <td className="px-5 py-4 text-slate-600">
+                      <td className="px-4 py-4 text-slate-600 sm:px-5">
                         {getTeacherLabel(routine.teacherId)}
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-4 sm:px-5">
                         <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
                           {formatDay(routine.day)}
                         </span>
                       </td>
 
-                      <td className="px-5 py-4 font-medium text-slate-700">
-                        {formatTime(routine.startTime)}
+                      <td className="px-4 py-4 font-medium text-slate-700 sm:px-5">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock size={14} className="text-slate-400" />
+                          {formatTime(routine.startTime)}
+                        </span>
                       </td>
 
-                      <td className="px-5 py-4 font-medium text-slate-700">
+                      <td className="px-4 py-4 font-medium text-slate-700 sm:px-5">
                         {formatTime(routine.endTime)}
                       </td>
 
                       {isAdmin && (
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-4 sm:px-5">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => openEditForm(routine)}
-                              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                              title="Edit routine"
+                              aria-label="Edit routine"
+                              className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-700 transition hover:bg-amber-100"
                             >
-                              Edit
+                              <Pencil size={15} />
                             </button>
 
                             <button
                               type="button"
                               onClick={() => handleDelete(routine._id)}
                               disabled={deletingId === routine._id}
-                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                              title="Delete routine"
+                              aria-label="Delete routine"
+                              className="rounded-lg border border-red-200 bg-red-50 p-2 text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                             >
-                              {deletingId === routine._id
-                                ? "Deleting..."
-                                : "Delete"}
+                              {deletingId === routine._id ? (
+                                <RefreshCw size={15} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={15} />
+                              )}
                             </button>
                           </div>
                         </td>
@@ -858,11 +611,251 @@ export default function Routine() {
             </div>
           )}
 
-          <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs text-slate-400 sm:px-6">
+          <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-400 sm:px-6">
             School Routine Management
           </div>
         </section>
       </div>
+
+      {/* ADD / EDIT ROUTINE POPUP */}
+      {showForm && isAdmin && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !saving) {
+              resetForm();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="routine-modal-title"
+            className="my-auto flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="hidden rounded-xl bg-blue-50 p-3 text-blue-600 sm:block">
+                  {editingId ? <Pencil size={21} /> : <CalendarDays size={21} />}
+                </div>
+
+                <div className="min-w-0">
+                  <h2
+                    id="routine-modal-title"
+                    className="text-base font-bold text-slate-900 sm:text-lg"
+                  >
+                    {editingId ? "Edit Routine" : "Add New Routine"}
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+                    {editingId
+                      ? "Update the class schedule details."
+                      : "Add a new class schedule to your school."}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={resetForm}
+                disabled={saving}
+                className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:opacity-50"
+                aria-label="Close popup"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            {/* Modal Form - Scrollable */}
+            <form
+              id="routine-form"
+              onSubmit={handleSubmit}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+                {error && (
+                  <div
+                    role="alert"
+                    className="mb-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p className="break-words">{error}</p>
+                  </div>
+                )}
+
+                <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50/60 p-3 sm:p-4">
+                  <p className="text-xs font-semibold text-blue-800 sm:text-sm">
+                    Routine Information
+                  </p>
+                  <p className="mt-1 text-xs text-blue-600">
+                    Select the class, subject, teacher and schedule time.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+                  <div>
+                    <label htmlFor="classId" className="mb-2 block text-sm font-semibold text-slate-700">
+                      Class <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="classId"
+                      name="classId"
+                      value={form.classId}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    >
+                      <option value="">Select class</option>
+                      {classes.map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {getClassLabel(item)}
+                        </option>
+                      ))}
+                    </select>
+                    {classes.length === 0 && (
+                      <p className="mt-1.5 text-xs text-amber-600">
+                        No classes loaded. Refresh or check the API response.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="subjectId" className="mb-2 block text-sm font-semibold text-slate-700">
+                      Subject <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="subjectId"
+                      name="subjectId"
+                      value={form.subjectId}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    >
+                      <option value="">Select subject</option>
+                      {subjects.map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {getSubjectLabel(item)}
+                        </option>
+                      ))}
+                    </select>
+                    {subjects.length === 0 && (
+                      <p className="mt-1.5 text-xs text-amber-600">
+                        No subjects loaded. Refresh or check the API response.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="teacherId" className="mb-2 block text-sm font-semibold text-slate-700">
+                      Teacher <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="teacherId"
+                      name="teacherId"
+                      value={form.teacherId}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    >
+                      <option value="">Select teacher</option>
+                      {teachers.map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {getTeacherLabel(item)}
+                        </option>
+                      ))}
+                    </select>
+                    {teachers.length === 0 && (
+                      <p className="mt-1.5 text-xs text-amber-600">
+                        No teachers loaded. Refresh or check the API response.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="day" className="mb-2 block text-sm font-semibold text-slate-700">
+                      Day <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="day"
+                      name="day"
+                      value={form.day}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    >
+                      {DAYS.map((day) => (
+                        <option key={day.value} value={day.value}>
+                          {day.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="startTime" className="mb-2 block text-sm font-semibold text-slate-700">
+                      Start Time <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="startTime"
+                      name="startTime"
+                      type="time"
+                      value={form.startTime}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="endTime" className="mb-2 block text-sm font-semibold text-slate-700">
+                      End Time <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="endTime"
+                      name="endTime"
+                      type="time"
+                      value={form.endTime}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Fixed Modal Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white p-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  disabled={saving}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      {editingId ? <Pencil size={16} /> : <Plus size={17} />}
+                      {editingId ? "Update Routine" : "Create Routine"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
