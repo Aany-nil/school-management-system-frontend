@@ -21,10 +21,7 @@ const initialForm = {
 };
 
 const getDueAmount = (totalFee, paidAmount) =>
-  Math.max(
-    0,
-    Number(totalFee || 0) - Number(paidAmount || 0)
-  );
+  Math.max(0, Number(totalFee || 0) - Number(paidAmount || 0));
 
 const getPaymentStatus = (totalFee, paidAmount) => {
   const total = Number(totalFee || 0);
@@ -46,18 +43,18 @@ function SummaryCard({ title, amount, icon, color }) {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-gray-500">
+    <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-gray-500 sm:text-sm">
           {title}
         </p>
 
-        <div className={`rounded-lg p-2.5 ${colorClasses[color]}`}>
+        <div className={`shrink-0 rounded-lg p-2 ${colorClasses[color]}`}>
           {icon}
         </div>
       </div>
 
-      <h2 className="mt-4 text-2xl font-bold text-gray-800">
+      <h2 className="mt-3 break-words text-lg font-bold text-gray-800 sm:mt-4 sm:text-2xl">
         {amount}
       </h2>
     </div>
@@ -71,17 +68,21 @@ export default function Fees() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showForm, setShowForm] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
 
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(initialForm);
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-
-
   const storedUser = (() => {
     try {
-      return JSON.parse(localStorage.getItem("user") || "{}");
+      return JSON.parse(
+        localStorage.getItem("user") ||
+          localStorage.getItem("tasmina_user") ||
+          "{}"
+      );
     } catch {
       return {};
     }
@@ -94,7 +95,6 @@ export default function Fees() {
   ).toLowerCase();
 
   const isAdmin = role === "admin";
-
 
   const loadFees = async () => {
     setLoading(true);
@@ -134,13 +134,19 @@ export default function Fees() {
         const response = await api.get("/fee/student-fees");
         const feeData = response.data?.data;
 
-        setFees(feeData ? [feeData] : []);
+        setFees(
+          Array.isArray(feeData)
+            ? feeData
+            : feeData
+              ? [feeData]
+              : []
+        );
       }
     } catch (err) {
       setFees([]);
       setError(
         err.response?.data?.message ||
-          "Fee records load,API ও login token check"
+          "Fee records load, API ও login token check"
       );
     } finally {
       setLoading(false);
@@ -168,11 +174,12 @@ export default function Fees() {
   };
 
   const closeForm = () => {
+    if (saving) return;
+
     setShowForm(false);
     setForm(initialForm);
     setError("");
   };
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -184,7 +191,7 @@ export default function Fees() {
     const paidAmount = Number(form.paidAmount);
 
     if (!form.student) {
-      setError("student select");
+      setError("Please select a student.");
       return;
     }
 
@@ -196,12 +203,12 @@ export default function Fees() {
       totalFee < 0 ||
       paidAmount < 0
     ) {
-      setError("Right fee amount, Negative amount");
+      setError("Please enter valid fee amounts. Negative amounts are not allowed.");
       return;
     }
 
     if (paidAmount > totalFee) {
-      setError("Paid amount less than total fee");
+      setError("Paid amount cannot be greater than total fee.");
       return;
     }
 
@@ -218,28 +225,30 @@ export default function Fees() {
         response.data?.message || "Fee successfully created."
       );
 
-      closeForm();
+      setShowForm(false);
+      setForm(initialForm);
+
       await loadFees();
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Fee create not active, Backend response"
+          "Fee creation failed. Please check the backend response."
       );
     } finally {
       setSaving(false);
     }
   };
 
-  // Fee delete
   const handleDelete = async (feeId) => {
     const confirmed = window.confirm(
-      "Are you record delete"
+      "Are you sure you want to delete this fee record?"
     );
 
     if (!confirmed) return;
 
     setError("");
     setSuccess("");
+    setDeletingId(feeId);
 
     try {
       const response = await api.delete(
@@ -254,12 +263,13 @@ export default function Fees() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "Fee delete"
+          "Fee deletion failed."
       );
+    } finally {
+      setDeletingId("");
     }
   };
 
-  // Search
   const filteredFees = fees.filter((fee) => {
     const student = fee.student || {};
 
@@ -276,7 +286,6 @@ export default function Fees() {
     return searchableText.includes(search.toLowerCase());
   });
 
-  // Summary
   const totalExpected = filteredFees.reduce(
     (sum, fee) => sum + Number(fee.totalFee || 0),
     0
@@ -310,11 +319,11 @@ export default function Fees() {
   };
 
   return (
-    <div className="min-h-screen space-y-6 bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen min-w-0 w-full space-y-5 bg-gray-50 p-3 sm:space-y-6 sm:p-5 lg:p-8">
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-gray-800 sm:text-3xl">
             Fee Management
           </h1>
 
@@ -323,14 +332,17 @@ export default function Fees() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <button
             type="button"
             onClick={loadFees}
             disabled={loading}
-            className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+            className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
           >
-            <RefreshCw size={17} />
+            <RefreshCw
+              size={17}
+              className={loading ? "animate-spin" : ""}
+            />
             Refresh
           </button>
 
@@ -338,7 +350,7 @@ export default function Fees() {
             <button
               type="button"
               onClick={openCreateForm}
-              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 sm:px-4"
             >
               <Plus size={18} />
               Add Fee
@@ -351,7 +363,7 @@ export default function Fees() {
       {error && !showForm && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          className="break-words rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
           {error}
         </div>
@@ -361,38 +373,40 @@ export default function Fees() {
       {success && (
         <div
           role="status"
-          className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
+          className="break-words rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
         >
           {success}
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         <SummaryCard
           title="Total Expected"
           amount={formatMoney(totalExpected)}
-          icon={<Wallet size={22} />}
+          icon={<Wallet size={20} />}
           color="blue"
         />
 
         <SummaryCard
           title="Total Collected"
           amount={formatMoney(totalCollected)}
-          icon={<CheckCircle size={22} />}
+          icon={<CheckCircle size={20} />}
           color="green"
         />
 
-        <SummaryCard
-          title="Total Due"
-          amount={formatMoney(totalDue)}
-          icon={<AlertCircle size={22} />}
-          color="red"
-        />
+        <div className="col-span-2 xl:col-span-1">
+          <SummaryCard
+            title="Total Due"
+            amount={formatMoney(totalDue)}
+            icon={<AlertCircle size={20} />}
+            color="red"
+          />
+        </div>
       </div>
 
-      {/* Table section */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+      {/* Table Section */}
+      <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5">
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <h2 className="text-lg font-bold text-gray-800">
@@ -415,34 +429,20 @@ export default function Fees() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search student or status..."
-              className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[750px] text-left text-sm">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[700px] text-left text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-600">
-                <th className="px-4 py-3 font-semibold">
-                  Student
-                </th>
-
-                <th className="px-4 py-3 font-semibold">
-                  Total Fee
-                </th>
-
-                <th className="px-4 py-3 font-semibold">
-                  Paid Amount
-                </th>
-
-                <th className="px-4 py-3 font-semibold">
-                  Due Amount
-                </th>
-
-                <th className="px-4 py-3 font-semibold">
-                  Status
-                </th>
+                <th className="px-4 py-3 font-semibold">Student</th>
+                <th className="px-4 py-3 font-semibold">Total Fee</th>
+                <th className="px-4 py-3 font-semibold">Paid Amount</th>
+                <th className="px-4 py-3 font-semibold">Due Amount</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
 
                 {isAdmin && (
                   <th className="px-4 py-3 text-right font-semibold">
@@ -505,27 +505,27 @@ export default function Fees() {
                             <Users size={18} />
                           </div>
 
-                          <div>
+                          <div className="min-w-0">
                             <p className="font-semibold text-gray-800">
                               {student.name || "Student"}
                             </p>
 
-                            <p className="mt-1 text-xs text-gray-500">
+                            <p className="mt-1 break-all text-xs text-gray-500">
                               {student.email || ""}
                             </p>
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-4 py-4 font-medium text-gray-800">
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-gray-800">
                         {formatMoney(fee.totalFee)}
                       </td>
 
-                      <td className="px-4 py-4 font-medium text-green-700">
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-green-700">
                         {formatMoney(fee.paidAmount)}
                       </td>
 
-                      <td className="px-4 py-4 font-medium text-red-600">
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-red-600">
                         {formatMoney(
                           fee.dueAmount ??
                             getDueAmount(
@@ -537,7 +537,7 @@ export default function Fees() {
 
                       <td className="px-4 py-4">
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
                             status
                           )}`}
                         >
@@ -556,14 +556,20 @@ export default function Fees() {
                           <div className="flex justify-end">
                             <button
                               type="button"
-                              onClick={() =>
-                                handleDelete(fee._id)
-                              }
+                              onClick={() => handleDelete(fee._id)}
+                              disabled={!!deletingId}
                               title="Delete fee"
                               aria-label="Delete fee"
-                              className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                              className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                              <Trash2 size={17} />
+                              <Trash2
+                                size={17}
+                                className={
+                                  deletingId === fee._id
+                                    ? "animate-pulse"
+                                    : ""
+                                }
+                              />
                             </button>
                           </div>
                         </td>
@@ -579,15 +585,16 @@ export default function Fees() {
 
       {/* Create Fee Modal */}
       {showForm && isAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="my-auto w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-5">
+          <div className="my-auto flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 p-4 sm:p-5">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-gray-800 sm:text-xl">
                   Create New Fee
                 </h2>
 
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-xs text-gray-500 sm:text-sm">
                   Enter student fee and payment details.
                 </p>
               </div>
@@ -595,141 +602,149 @@ export default function Fees() {
               <button
                 type="button"
                 onClick={closeForm}
+                disabled={saving}
                 aria-label="Close form"
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 disabled:opacity-50"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {error && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-              >
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="student"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
-                  Select Student *
-                </label>
-
-                <select
-                  id="student"
-                  name="student"
-                  value={form.student}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Choose a student</option>
-
-                  {students.map((student) => (
-                    <option key={student._id} value={student._id}>
-                      {student.name} ({student.email})
-                    </option>
-                  ))}
-                </select>
-
-                {students.length === 0 && (
-                  <p className="mt-1 text-xs text-amber-700">
-                    Student list not load/student/all-students endpoint check।
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label
-                  htmlFor="totalFee"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
-                  Total Fee (৳) *
-                </label>
-
-                <input
-                  id="totalFee"
-                  type="number"
-                  name="totalFee"
-                  value={form.totalFee}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  required
-                  placeholder="5000"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="paidAmount"
-                  className="mb-1.5 block text-sm font-medium text-gray-700"
-                >
-                  Paid Amount (৳)
-                </label>
-
-                <input
-                  id="paidAmount"
-                  type="number"
-                  name="paidAmount"
-                  value={form.paidAmount}
-                  onChange={handleChange}
-                  min="0"
-                  step="0.01"
-                  required
-                  placeholder="0"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div className="space-y-3 rounded-lg bg-gray-50 p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">
-                    Due Amount
-                  </span>
-
-                  <span className="font-bold text-red-600">
-                    {formatMoney(
-                      getDueAmount(
-                        form.totalFee,
-                        form.paidAmount
-                      )
-                    )}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">
-                    Payment Status
-                  </span>
-
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                      getPaymentStatus(
-                        form.totalFee,
-                        form.paidAmount
-                      )
-                    )}`}
+            {/* Modal Form */}
+            <form
+              onSubmit={handleSubmit}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+                {error && (
+                  <div
+                    role="alert"
+                    className="break-words rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
                   >
-                    {getPaymentStatus(
-                      form.totalFee,
-                      form.paidAmount
-                    )}
-                  </span>
+                    {error}
+                  </div>
+                )}
+
+                <div>
+                  <label
+                    htmlFor="student"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Select Student *
+                  </label>
+
+                  <select
+                    id="student"
+                    name="student"
+                    value={form.student}
+                    onChange={handleChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">Choose a student</option>
+
+                    {students.map((student) => (
+                      <option key={student._id} value={student._id}>
+                        {student.name} ({student.email})
+                      </option>
+                    ))}
+                  </select>
+
+                  {students.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Student list could not load. Please check the
+                      /student/all-students endpoint.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="totalFee"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Total Fee (৳) *
+                  </label>
+
+                  <input
+                    id="totalFee"
+                    type="number"
+                    name="totalFee"
+                    value={form.totalFee}
+                    onChange={handleChange}
+                    min="0"
+                    step="0.01"
+                    required
+                    placeholder="5000"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="paidAmount"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Paid Amount (৳)
+                  </label>
+
+                  <input
+                    id="paidAmount"
+                    type="number"
+                    name="paidAmount"
+                    value={form.paidAmount}
+                    onChange={handleChange}
+                    min="0"
+                    step="0.01"
+                    required
+                    placeholder="0"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                <div className="space-y-3 rounded-lg bg-gray-50 p-4">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-gray-600">Due Amount</span>
+
+                    <span className="font-bold text-red-600">
+                      {formatMoney(
+                        getDueAmount(
+                          form.totalFee,
+                          form.paidAmount
+                        )
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-gray-600">
+                      Payment Status
+                    </span>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                        getPaymentStatus(
+                          form.totalFee,
+                          form.paidAmount
+                        )
+                      )}`}
+                    >
+                      {getPaymentStatus(
+                        form.totalFee,
+                        form.paidAmount
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              {/* Modal Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  disabled={saving}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -737,8 +752,12 @@ export default function Fees() {
                 <button
                   type="submit"
                   disabled={saving || students.length === 0}
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
+                  {saving && (
+                    <RefreshCw size={16} className="animate-spin" />
+                  )}
+
                   {saving ? "Saving..." : "Create Fee"}
                 </button>
               </div>
