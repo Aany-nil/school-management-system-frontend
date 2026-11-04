@@ -245,15 +245,16 @@ export default function ClassManagement() {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Page heading */}
+    <div className="min-h-screen w-full min-w-0 space-y-5 p-3 sm:space-y-6 sm:p-5 lg:p-8">
+
+      {/* Page Heading */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
             Class Management
           </h1>
 
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
             Create and manage your school's classes.
           </p>
         </div>
@@ -261,7 +262,7 @@ export default function ClassManagement() {
         <button
           type="button"
           onClick={openAddForm}
-          className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 sm:w-auto"
         >
           <Plus size={18} />
           Add Class
@@ -272,13 +273,20 @@ export default function ClassManagement() {
       {success && (
         <div
           role="status"
-          className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+          className="flex items-start justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
         >
-          {success}
+          <span>{success}</span>
+          <button
+            type="button"
+            onClick={() => setSuccess("")}
+            aria-label="Dismiss success message"
+          >
+            <X size={18} />
+          </button>
         </div>
       )}
 
-      {error && (
+      {error && !showForm && (
         <div
           role="alert"
           className="flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
@@ -295,38 +303,44 @@ export default function ClassManagement() {
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
-            <School size={24} />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5">
+          <div className="shrink-0 rounded-xl bg-blue-100 p-2.5 text-blue-700 sm:p-3">
+            <School size={21} />
           </div>
 
-          <div>
-            <p className="text-sm text-slate-500">Total Classes</p>
-            <h2 className="text-2xl font-bold text-slate-900">
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500 sm:text-sm">
+              Total Classes
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">
               {classes.length}
             </h2>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
-            <Layers size={24} />
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:gap-4 sm:p-5">
+          <div className="shrink-0 rounded-xl bg-indigo-100 p-2.5 text-indigo-700 sm:p-3">
+            <Layers size={21} />
           </div>
 
-          <div>
-            <p className="text-sm text-slate-500">Search Results</p>
-            <h2 className="text-2xl font-bold text-slate-900">
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500 sm:text-sm">
+              Search Results
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">
               {filteredClasses.length}
             </h2>
           </div>
         </div>
       </div>
 
-      {/* Classes table */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="relative max-w-md">
+      {/* Classes Table */}
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+
+        {/* Search */}
+        <div className="relative w-full sm:max-w-md">
           <Search
             size={18}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -336,19 +350,20 @@ export default function ClassManagement() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search class, section, year or teacher..."
-            className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-blue-500"
+            className="w-full rounded-xl border border-slate-200 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
         </div>
 
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[800px] text-left">
+        {/* Table */}
+        <div className="mt-5 w-full overflow-x-auto rounded-xl">
+          <table className="w-full min-w-[750px] text-left">
             <thead>
-              <tr className="border-b border-slate-200 text-sm text-slate-500">
-                <th className="px-3 py-3">Class Name</th>
-                <th className="px-3 py-3">Section</th>
-                <th className="px-3 py-3">Academic Year</th>
-                <th className="px-3 py-3">Assigned Teacher</th>
-                <th className="px-3 py-3 text-right">Actions</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500 sm:text-sm">
+                <th className="px-3 py-3 font-semibold">Class Name</th>
+                <th className="px-3 py-3 font-semibold">Section</th>
+                <th className="px-3 py-3 font-semibold">Academic Year</th>
+                <th className="px-3 py-3 font-semibold">Assigned Teacher</th>
+                <th className="px-3 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
 
@@ -359,29 +374,32 @@ export default function ClassManagement() {
                     colSpan={5}
                     className="px-3 py-12 text-center text-sm text-slate-500"
                   >
-                    Loading classes...
+                    <div className="flex items-center justify-center gap-2">
+                      <RefreshCw size={17} className="animate-spin" />
+                      Loading classes...
+                    </div>
                   </td>
                 </tr>
               ) : filteredClasses.length > 0 ? (
                 filteredClasses.map((item) => (
                   <tr
                     key={item._id}
-                    className="border-b border-slate-100"
+                    className="border-b border-slate-100 transition hover:bg-slate-50"
                   >
                     <td className="px-3 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="rounded-xl bg-blue-100 p-2 text-blue-700">
+                        <div className="shrink-0 rounded-xl bg-blue-100 p-2 text-blue-700">
                           <School size={18} />
                         </div>
 
-                        <span className="font-medium text-slate-900">
+                        <span className="text-sm font-medium text-slate-900">
                           {item.className}
                         </span>
                       </div>
                     </td>
 
                     <td className="px-3 py-4 text-sm text-slate-600">
-                      <span className="rounded-full bg-blue-50 px-3 py-1 font-medium text-blue-700">
+                      <span className="whitespace-nowrap rounded-full bg-blue-50 px-3 py-1 font-medium text-blue-700">
                         {item.section}
                       </span>
                     </td>
@@ -393,16 +411,16 @@ export default function ClassManagement() {
                     <td className="px-3 py-4">
                       {item.teacherId?.name ? (
                         <div className="flex items-center gap-2">
-                          <div className="rounded-full bg-purple-100 p-2 text-purple-700">
+                          <div className="shrink-0 rounded-full bg-purple-100 p-2 text-purple-700">
                             <UserRound size={16} />
                           </div>
 
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-sm font-medium text-slate-800">
                               {item.teacherId.name}
                             </p>
 
-                            <p className="text-xs text-slate-500">
+                            <p className="break-all text-xs text-slate-500">
                               {item.teacherId.email}
                             </p>
                           </div>
@@ -420,7 +438,7 @@ export default function ClassManagement() {
                           type="button"
                           onClick={() => openEditForm(item)}
                           aria-label="Edit class"
-                          className="rounded-lg border border-slate-200 p-2 text-blue-600 hover:bg-blue-50"
+                          className="rounded-lg border border-slate-200 p-2 text-blue-600 transition hover:bg-blue-50"
                         >
                           <Pencil size={17} />
                         </button>
@@ -430,10 +448,10 @@ export default function ClassManagement() {
                           onClick={() => handleDelete(item)}
                           disabled={deletingId === item._id}
                           aria-label="Delete class"
-                          className="rounded-lg border border-slate-200 p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-lg border border-slate-200 p-2 text-red-600 transition hover:bg-red-50 disabled:opacity-50"
                         >
                           {deletingId === item._id ? (
-                            <span className="text-xs">...</span>
+                            <RefreshCw size={17} className="animate-spin" />
                           ) : (
                             <Trash2 size={17} />
                           )}
@@ -457,19 +475,31 @@ export default function ClassManagement() {
             </tbody>
           </table>
         </div>
+
+        {/* Table Footer */}
+        {!loading && (
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-500 sm:text-sm">
+              Showing {filteredClasses.length} of {classes.length} classes
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Add / Edit modal */}
+      {/* Add / Edit Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
-          <div className="my-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/50 p-3 sm:p-5">
+
+          <div className="my-auto flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 p-4 sm:p-6">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
                   {editingClass ? "Edit Class" : "Add Class"}
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                   Enter the class details and assign a teacher.
                 </p>
               </div>
@@ -480,107 +510,121 @@ export default function ClassManagement() {
                   setShowForm(false);
                   setError("");
                 }}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                disabled={saving}
+                className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
                 aria-label="Close form"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Class Name */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Class Name
-                </label>
+            {/* Scrollable Form */}
+            <form
+              onSubmit={handleSubmit}
+              className="flex min-h-0 flex-1 flex-col overflow-hidden"
+            >
+              <div className="space-y-4 overflow-y-auto p-4 sm:p-6">
 
-                <input
-                  name="className"
-                  value={formData.className}
-                  onChange={handleChange}
-                  required
-                  disabled={saving}
-                  placeholder="e.g. Class 6"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                />
-              </div>
+                {/* Class Name */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Class Name
+                  </label>
 
-              {/* Section */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Section
-                </label>
+                  <input
+                    name="className"
+                    value={formData.className}
+                    onChange={handleChange}
+                    required
+                    disabled={saving}
+                    placeholder="e.g. Class 6"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                  />
+                </div>
 
-                <input
-                  name="section"
-                  value={formData.section}
-                  onChange={handleChange}
-                  required
-                  disabled={saving}
-                  placeholder="e.g. A"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                />
-              </div>
+                {/* Section */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Section
+                  </label>
 
-              {/* Academic Year */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Academic Year
-                </label>
+                  <input
+                    name="section"
+                    value={formData.section}
+                    onChange={handleChange}
+                    required
+                    disabled={saving}
+                    placeholder="e.g. A"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                  />
+                </div>
 
-                <input
-                  type="number"
-                  name="academicYear"
-                  value={formData.academicYear}
-                  onChange={handleChange}
-                  required
-                  disabled={saving}
-                  placeholder="e.g. 2026"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                />
-              </div>
+                {/* Academic Year */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Academic Year
+                  </label>
 
-              {/* Teacher Select */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Assign Teacher
-                </label>
+                  <input
+                    type="number"
+                    name="academicYear"
+                    value={formData.academicYear}
+                    onChange={handleChange}
+                    required
+                    disabled={saving}
+                    placeholder="e.g. 2026"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                  />
+                </div>
 
-                <select
-                  name="teacherId"
-                  value={formData.teacherId}
-                  onChange={handleChange}
-                  required
-                  disabled={saving || teacherLoading}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500 disabled:bg-slate-100"
-                >
-                  <option value="">
-                    {teacherLoading
-                      ? "Loading teachers..."
-                      : "Select a teacher"}
-                  </option>
+                {/* Teacher Select */}
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    Assign Teacher
+                  </label>
 
-                  {teachers.map((teacher) => (
-                    <option key={teacher._id} value={teacher._id}>
-                      {teacher.name} ({teacher.email})
+                  <select
+                    name="teacherId"
+                    value={formData.teacherId}
+                    onChange={handleChange}
+                    required
+                    disabled={saving || teacherLoading}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                  >
+                    <option value="">
+                      {teacherLoading
+                        ? "Loading teachers..."
+                        : "Select a teacher"}
                     </option>
-                  ))}
-                </select>
 
-                {!teacherLoading && teachers.length === 0 && (
-                  <p className="mt-1 text-xs text-red-500">
-                    No teachers found. Please add a teacher first.
-                  </p>
+                    {teachers.map((teacher) => (
+                      <option key={teacher._id} value={teacher._id}>
+                        {teacher.name} ({teacher.email})
+                      </option>
+                    ))}
+                  </select>
+
+                  {!teacherLoading && teachers.length === 0 && (
+                    <p className="mt-2 text-xs text-red-500">
+                      No teachers found. Please add a teacher first.
+                    </p>
+                  )}
+                </div>
+
+                {/* Form Error */}
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-600"
+                  >
+                    {error}
+                  </div>
                 )}
               </div>
 
-              {error && (
-                <p role="alert" className="text-sm text-red-600">
-                  {error}
-                </p>
-              )}
+              {/* Modal Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white p-4 sm:flex-row sm:justify-end sm:gap-3 sm:p-5">
 
-              <div className="flex justify-end gap-3 pt-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -588,7 +632,7 @@ export default function ClassManagement() {
                     setError("");
                   }}
                   disabled={saving}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 sm:w-auto sm:py-2.5"
                 >
                   Cancel
                 </button>
@@ -596,7 +640,7 @@ export default function ClassManagement() {
                 <button
                   type="submit"
                   disabled={saving || teacherLoading || teachers.length === 0}
-                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:py-2.5"
                 >
                   {saving ? (
                     <>
