@@ -14,18 +14,28 @@ import {
     CalendarDays,
     RefreshCw,
     School,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 
 import api from "../../services/api";
+
+const ITEMS_PER_PAGE = 5;
 
 const Subject = () => {
     const [classes, setClasses] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const [selectedClassFilter, setSelectedClassFilter] = useState("all");
+    const [selectedYear, setSelectedYear] = useState("all");
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [expandedClasses, setExpandedClasses] = useState({});
+    const [classPages, setClassPages] = useState({});
 
     // Fetch teacher's classes and subjects
     const fetchData = async () => {
@@ -44,14 +54,15 @@ const Subject = () => {
             setClasses(classData);
             setSubjects(subjectData);
 
-            // Expand all classes by default
+            // Expand first class by default
             const expanded = {};
 
-            classData.forEach((item) => {
-                expanded[item._id] = true;
+            classData.forEach((item, index) => {
+                expanded[item._id] = index === 0;
             });
 
             setExpandedClasses(expanded);
+            setClassPages({});
         } catch (err) {
             console.error("Subject page error:", err);
 
@@ -68,11 +79,20 @@ const Subject = () => {
         fetchData();
     }, []);
 
+    // Available academic years
+    const academicYears = useMemo(() => {
+        return [
+            ...new Set(
+                classes
+                    .map((item) => String(item.academicYear || ""))
+                    .filter(Boolean)
+            ),
+        ].sort((a, b) => b.localeCompare(a));
+    }, [classes]);
+
     // Search subjects
     const filteredSubjects = useMemo(() => {
-        const search = searchTerm.toLowerCase().trim();
-
-        if (!search) return subjects;
+        const search = searchTerm.trim().toLowerCase();
 
         return subjects.filter((subject) => {
             const subjectName = subject.subjectName?.toLowerCase() || "";
@@ -89,7 +109,22 @@ const Subject = () => {
         });
     }, [subjects, searchTerm]);
 
-    // Get subjects for a particular class
+    // Filter classes
+    const filteredClasses = useMemo(() => {
+        return classes.filter((item) => {
+            const matchesClass =
+                selectedClassFilter === "all" ||
+                item._id === selectedClassFilter;
+
+            const matchesYear =
+                selectedYear === "all" ||
+                String(item.academicYear || "") === selectedYear;
+
+            return matchesClass && matchesYear;
+        });
+    }, [classes, selectedClassFilter, selectedYear]);
+
+    // Get subjects for a class
     const getClassSubjects = (classId) => {
         return filteredSubjects.filter(
             (subject) => subject.classId?._id === classId
@@ -103,6 +138,33 @@ const Subject = () => {
             [classId]: !prev[classId],
         }));
     };
+
+    // Reset pagination when search/filter changes
+    useEffect(() => {
+        setClassPages({});
+    }, [searchTerm, selectedClassFilter, selectedYear]);
+
+    // Clear filters
+    const clearFilters = () => {
+        setSearchTerm("");
+        setSelectedClassFilter("all");
+        setSelectedYear("all");
+        setClassPages({});
+    };
+
+    const hasActiveFilters =
+        searchTerm.trim() !== "" ||
+        selectedClassFilter !== "all" ||
+        selectedYear !== "all";
+
+    const totalFilteredSubjects = filteredClasses.reduce(
+        (total, item) => total + getClassSubjects(item._id).length,
+        0
+    );
+
+    const activeClassCount = filteredClasses.filter(
+        (item) => getClassSubjects(item._id).length > 0
+    ).length;
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -129,7 +191,6 @@ const Subject = () => {
                         </p>
                     </div>
 
-                    {/* Refresh Button */}
                     <button
                         onClick={fetchData}
                         disabled={loading}
@@ -160,7 +221,6 @@ const Subject = () => {
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-3 sm:gap-5">
 
-                    {/* Total Subjects */}
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-5">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -183,7 +243,6 @@ const Subject = () => {
                         </div>
                     </div>
 
-                    {/* Assigned Classes */}
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md sm:p-5">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -207,46 +266,123 @@ const Subject = () => {
                     </div>
                 </div>
 
-                {/* Search Section */}
+                {/* Search and Filter Section */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                    <div className="mb-3">
+
+                    <div className="mb-4">
                         <h2 className="text-base font-bold text-slate-800">
-                            Search Subjects
+                            Find Your Subjects
                         </h2>
 
                         <p className="mt-1 text-xs text-slate-500">
-                            Search by subject name, code or class.
+                            Search and filter subjects by name, code or class.
                         </p>
                     </div>
 
-                    <div className="relative">
-                        <Search
-                            size={19}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                        />
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
 
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search by subject name, code or class..."
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-11 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-                        />
+                        {/* Search */}
+                        <div className="relative md:col-span-2 xl:col-span-1">
+                            <Search
+                                size={18}
+                                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
 
-                        {searchTerm && (
-                            <button
-                                onClick={() => setSearchTerm("")}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
-                                aria-label="Clear search"
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search subject name or code..."
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-10 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                            />
+
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700"
+                                    aria-label="Clear search"
+                                >
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Class Filter */}
+                        <div className="relative">
+                            <GraduationCap
+                                size={17}
+                                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+
+                            <select
+                                value={selectedClassFilter}
+                                onChange={(e) =>
+                                    setSelectedClassFilter(e.target.value)
+                                }
+                                className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-8 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
                             >
-                                <X size={17} />
+                                <option value="all">All Assigned Classes</option>
+
+                                {classes.map((item) => (
+                                    <option key={item._id} value={item._id}>
+                                        {item.className}
+                                        {item.section ? ` - ${item.section}` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Academic Year Filter */}
+                        <div className="relative">
+                            <CalendarDays
+                                size={17}
+                                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => setSelectedYear(e.target.value)}
+                                className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-8 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
+                            >
+                                <option value="all">All Academic Years</option>
+
+                                {academicYears.map((year) => (
+                                    <option key={year} value={year}>
+                                        {year}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Filter Summary */}
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                        <p className="text-xs text-slate-500">
+                            Showing{" "}
+                            <span className="font-semibold text-slate-700">
+                                {totalFilteredSubjects}
+                            </span>{" "}
+                            subjects in{" "}
+                            <span className="font-semibold text-slate-700">
+                                {activeClassCount}
+                            </span>{" "}
+                            classes
+                        </p>
+
+                        {hasActiveFilters && (
+                            <button
+                                onClick={clearFilters}
+                                className="text-xs font-semibold text-blue-600 transition hover:text-blue-800"
+                            >
+                                Clear all filters
                             </button>
                         )}
                     </div>
                 </div>
 
                 {/* Class-wise Subject Lists */}
-                <div className="space-y-5">
+                <div className="space-y-4">
+
                     {loading ? (
                         <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white py-20">
                             <RefreshCw
@@ -272,15 +408,50 @@ const Subject = () => {
                                 You have not been assigned to any class yet.
                             </p>
                         </div>
+                    ) : filteredClasses.length === 0 ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
+                            <Search size={30} className="mx-auto text-slate-300" />
+
+                            <h3 className="mt-3 font-semibold text-slate-800">
+                                No Matching Classes
+                            </h3>
+
+                            <p className="mt-1 text-sm text-slate-500">
+                                Try changing your search or filter options.
+                            </p>
+
+                            <button
+                                onClick={clearFilters}
+                                className="mt-4 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
                     ) : (
-                        classes.map((classItem) => {
+                        filteredClasses.map((classItem) => {
                             const classSubjects = getClassSubjects(classItem._id);
                             const isExpanded = expandedClasses[classItem._id];
 
-                            // Hide classes without matching subjects during search
-                            if (searchTerm && classSubjects.length === 0) {
-                                return null;
-                            }
+                            const currentPage = classPages[classItem._id] || 1;
+                            const totalPages = Math.ceil(
+                                classSubjects.length / ITEMS_PER_PAGE
+                            );
+
+                            const startIndex =
+                                (currentPage - 1) * ITEMS_PER_PAGE;
+
+                            const visibleSubjects = classSubjects.slice(
+                                startIndex,
+                                startIndex + ITEMS_PER_PAGE
+                            );
+
+                            const showingFrom =
+                                classSubjects.length === 0 ? 0 : startIndex + 1;
+
+                            const showingTo = Math.min(
+                                startIndex + ITEMS_PER_PAGE,
+                                classSubjects.length
+                            );
 
                             return (
                                 <div
@@ -305,7 +476,7 @@ const Subject = () => {
                                                         : ""}
                                                 </h3>
 
-                                                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                                                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
                                                     <CalendarDays size={13} />
                                                     Academic Year:{" "}
                                                     {classItem.academicYear || "N/A"}
@@ -351,40 +522,24 @@ const Subject = () => {
                                                 <>
                                                     {/* Table Header */}
                                                     <div className="hidden grid-cols-12 gap-3 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
-                                                        <div className="col-span-1">
-                                                            No.
-                                                        </div>
-
-                                                        <div className="col-span-5">
-                                                            Subject Name
-                                                        </div>
-
-                                                        <div className="col-span-3">
-                                                            Subject Code
-                                                        </div>
-
-                                                        <div className="col-span-2">
-                                                            Class
-                                                        </div>
-
-                                                        <div className="col-span-1 text-right">
-                                                            Action
-                                                        </div>
+                                                        <div className="col-span-1">No.</div>
+                                                        <div className="col-span-5">Subject Name</div>
+                                                        <div className="col-span-3">Subject Code</div>
+                                                        <div className="col-span-2">Class</div>
+                                                        <div className="col-span-1 text-right">Action</div>
                                                     </div>
 
                                                     {/* Subject Rows */}
                                                     <div className="divide-y divide-slate-100">
-                                                        {classSubjects.map((subject, index) => (
+                                                        {visibleSubjects.map((subject, index) => (
                                                             <div
                                                                 key={subject._id}
                                                                 className="flex flex-col gap-3 px-4 py-4 transition duration-200 hover:bg-blue-50/40 sm:px-5 md:grid md:grid-cols-12 md:items-center md:gap-3"
                                                             >
-                                                                {/* Number */}
                                                                 <div className="hidden text-sm font-medium text-slate-400 md:col-span-1 md:block">
-                                                                    {String(index + 1).padStart(2, "0")}
+                                                                    {String(startIndex + index + 1).padStart(2, "0")}
                                                                 </div>
 
-                                                                {/* Subject Name */}
                                                                 <div className="flex min-w-0 items-center gap-3 md:col-span-5">
                                                                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                                                                         <BookMarked size={19} />
@@ -401,7 +556,6 @@ const Subject = () => {
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Subject Code */}
                                                                 <div className="hidden md:col-span-3 md:block">
                                                                     <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-medium text-slate-600">
                                                                         <Hash size={13} />
@@ -411,7 +565,6 @@ const Subject = () => {
                                                                     </span>
                                                                 </div>
 
-                                                                {/* Class */}
                                                                 <div className="hidden md:col-span-2 md:block">
                                                                     <span className="break-words text-sm text-slate-600">
                                                                         {classItem.className}
@@ -421,10 +574,9 @@ const Subject = () => {
                                                                     </span>
                                                                 </div>
 
-                                                                {/* Action */}
                                                                 <div className="flex items-center justify-between md:col-span-1 md:justify-end">
                                                                     <span className="text-xs text-slate-400 md:hidden">
-                                                                        Subject {index + 1}
+                                                                        Subject {startIndex + index + 1}
                                                                     </span>
 
                                                                     <button
@@ -438,6 +590,57 @@ const Subject = () => {
                                                             </div>
                                                         ))}
                                                     </div>
+
+                                                    {/* Per-class Pagination */}
+                                                    {totalPages > 1 && (
+                                                        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                                                            <p className="text-xs text-slate-500">
+                                                                Showing{" "}
+                                                                <span className="font-semibold text-slate-700">
+                                                                    {showingFrom}-{showingTo}
+                                                                </span>{" "}
+                                                                of{" "}
+                                                                <span className="font-semibold text-slate-700">
+                                                                    {classSubjects.length}
+                                                                </span>{" "}
+                                                                subjects
+                                                            </p>
+
+                                                            <div className="flex items-center justify-between gap-2 sm:justify-end">
+                                                                <button
+                                                                    onClick={() =>
+                                                                        setClassPages((prev) => ({
+                                                                            ...prev,
+                                                                            [classItem._id]: Math.max(currentPage - 1, 1),
+                                                                        }))
+                                                                    }
+                                                                    disabled={currentPage === 1}
+                                                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                >
+                                                                    <ChevronLeft size={15} />
+                                                                    Previous
+                                                                </button>
+
+                                                                <span className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white">
+                                                                    {currentPage} / {totalPages}
+                                                                </span>
+
+                                                                <button
+                                                                    onClick={() =>
+                                                                        setClassPages((prev) => ({
+                                                                            ...prev,
+                                                                            [classItem._id]: Math.min(currentPage + 1, totalPages),
+                                                                        }))
+                                                                    }
+                                                                    disabled={currentPage === totalPages}
+                                                                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                                >
+                                                                    Next
+                                                                    <ChevronRight size={15} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -447,33 +650,6 @@ const Subject = () => {
                         })
                     )}
                 </div>
-
-                {/* No Search Results */}
-                {!loading &&
-                    searchTerm &&
-                    classes.length > 0 &&
-                    filteredSubjects.length === 0 && (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                                <Search size={27} />
-                            </div>
-
-                            <h3 className="mt-3 font-semibold text-slate-800">
-                                No Subjects Found
-                            </h3>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                                Try searching with another subject name or code.
-                            </p>
-
-                            <button
-                                onClick={() => setSearchTerm("")}
-                                className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                            >
-                                Clear Search
-                            </button>
-                        </div>
-                    )}
             </div>
 
             {/* Subject Details Modal */}
@@ -516,7 +692,6 @@ const Subject = () => {
                         {/* Modal Body */}
                         <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
 
-                            {/* Subject Name */}
                             <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
                                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-500">
                                     Subject Name
@@ -527,10 +702,8 @@ const Subject = () => {
                                 </p>
                             </div>
 
-                            {/* Subject Information */}
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
-                                {/* Subject Code */}
                                 <div className="rounded-xl border border-slate-100 bg-white p-4">
                                     <div className="mb-2 flex items-center gap-2 text-slate-400">
                                         <Hash size={15} />
@@ -544,7 +717,6 @@ const Subject = () => {
                                     </p>
                                 </div>
 
-                                {/* Class */}
                                 <div className="rounded-xl border border-slate-100 bg-white p-4">
                                     <div className="mb-2 flex items-center gap-2 text-slate-400">
                                         <GraduationCap size={16} />
@@ -562,7 +734,6 @@ const Subject = () => {
                                 </div>
                             </div>
 
-                            {/* Academic Year */}
                             <div className="rounded-xl border border-slate-100 bg-white p-4">
                                 <div className="mb-2 flex items-center gap-2 text-slate-400">
                                     <CalendarDays size={15} />
@@ -576,13 +747,12 @@ const Subject = () => {
                                 </p>
                             </div>
 
-                            {/* Description */}
                             <div>
                                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                                     Description
                                 </p>
 
-                                <p className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                                <p className="break-words rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
                                     {selectedSubject.description ||
                                         "No description available for this subject."}
                                 </p>
