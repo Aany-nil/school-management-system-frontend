@@ -18,18 +18,37 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 
+const getCurrentMonth = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
 const initialForm = {
   teacher: "",
-  month: new Date().toISOString().slice(0, 7),
+  month: getCurrentMonth(),
 };
 
 const formatMoney = (amount) =>
   `৳ ${Number(amount || 0).toLocaleString("en-BD")}`;
 
+const getDueAmount = (salary) =>
+  Math.max(
+    0,
+    Number(
+      salary.dueAmount ??
+        Number(salary.salaryAmount || 0) -
+          Number(salary.paidAmount || 0)
+    )
+  );
+
 const getStatus = (salary) => {
   if (salary.status) return salary.status;
-  if (Number(salary.dueAmount || 0) <= 0) return "Paid";
-  if (Number(salary.paidAmount || 0) > 0) return "Partial";
+
+  const due = getDueAmount(salary);
+  const paid = Number(salary.paidAmount || 0);
+
+  if (due <= 0) return "Paid";
+  if (paid > 0) return "Partial";
   return "Due";
 };
 
@@ -41,14 +60,18 @@ function SummaryCard({ title, amount, icon, color }) {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <div className={`rounded-lg p-2.5 ${colors[color]}`}>
+    <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-gray-500 sm:text-sm">
+          {title}
+        </p>
+
+        <div className={`shrink-0 rounded-lg p-2 ${colors[color]}`}>
           {icon}
         </div>
       </div>
-      <h2 className="mt-4 text-2xl font-bold text-gray-800">
+
+      <h2 className="mt-3 break-words text-lg font-bold text-gray-800 sm:mt-4 sm:text-2xl">
         {amount}
       </h2>
     </div>
@@ -64,7 +87,7 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${
         styles[status] || styles.Due
       }`}
     >
@@ -82,8 +105,11 @@ export default function Salary() {
   const [salaries, setSalaries] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [search, setSearch] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
+  const [payslipLoading, setPayslipLoading] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [paymentSalary, setPaymentSalary] = useState(null);
@@ -91,12 +117,17 @@ export default function Salary() {
 
   const [form, setForm] = useState(initialForm);
   const [paidAmount, setPaidAmount] = useState("");
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   const storedUser = (() => {
     try {
-      return JSON.parse(localStorage.getItem("user") || "{}");
+      return JSON.parse(
+        localStorage.getItem("user") ||
+          localStorage.getItem("tasmina_user") ||
+          "{}"
+      );
     } catch {
       return {};
     }
@@ -115,18 +146,23 @@ export default function Salary() {
     (teacher) => teacher._id === form.teacher
   );
 
-  const loadSalaries = async () => {
-    setLoading(true);
+  const hasOpenModal =
+    showCreateModal || !!paymentSalary || !!payslip;
+
+  const loadSalaries = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
     setError("");
 
     try {
       if (isAdmin) {
         const response = await api.get("/salary/allsalaries");
         const list = response.data?.data?.salaries;
+
         setSalaries(Array.isArray(list) ? list : []);
       } else if (isTeacher) {
         const response = await api.get("/salary/teacher-salary");
         const list = response.data?.data?.salaries;
+
         setSalaries(Array.isArray(list) ? list : []);
       } else {
         setSalaries([]);
@@ -139,7 +175,7 @@ export default function Salary() {
           "Failed to load salary records."
       );
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -172,12 +208,16 @@ export default function Salary() {
     }
   };
 
-  useEffect(() => {
-    loadSalaries();
+  const refreshData = async () => {
+    setError("");
+    await Promise.all([
+      loadSalaries(),
+      isAdmin ? loadTeachers() : Promise.resolve(),
+    ]);
+  };
 
-    if (isAdmin) {
-      loadTeachers();
-    }
+  useEffect(() => {
+    refreshData();
   }, []);
 
   const handleFormChange = (e) => {
@@ -189,9 +229,26 @@ export default function Salary() {
     }));
   };
 
+  const openCreateModal = () => {
+    setForm(initialForm);
+    setError("");
+    setSuccess("");
+    setShowCreateModal(true);
+  };
+
   const closeCreateModal = () => {
+    if (saving) return;
+
     setShowCreateModal(false);
     setForm(initialForm);
+    setError("");
+  };
+
+  const closePaymentModal = () => {
+    if (saving) return;
+
+    setPaymentSalary(null);
+    setPaidAmount("");
     setError("");
   };
 
@@ -250,7 +307,7 @@ export default function Salary() {
     setSuccess("");
 
     const amount = Number(paidAmount);
-    const due = Number(paymentSalary.dueAmount || 0);
+    const due = getDueAmount(paymentSalary);
 
     if (
       paidAmount === "" ||
@@ -304,6 +361,7 @@ export default function Salary() {
 
     setError("");
     setSuccess("");
+    setDeletingId(id);
 
     try {
       const response = await api.delete(`/salary/delete/${id}`);
@@ -319,12 +377,15 @@ export default function Salary() {
         err.response?.data?.message ||
           "Failed to delete salary."
       );
+    } finally {
+      setDeletingId("");
     }
   };
 
   const handleViewPayslip = async (id) => {
     setError("");
-    setPayslip(null);
+    setSuccess("");
+    setPayslipLoading(true);
 
     try {
       const response = await api.get(`/salary/payslip/${id}`);
@@ -334,6 +395,8 @@ export default function Salary() {
         err.response?.data?.message ||
           "Failed to load payslip."
       );
+    } finally {
+      setPayslipLoading(false);
     }
   };
 
@@ -354,55 +417,84 @@ export default function Salary() {
   });
 
   const totalSalary = filteredSalaries.reduce(
-    (sum, salary) => sum + Number(salary.salaryAmount || 0),
+    (sum, salary) =>
+      sum + Number(salary.salaryAmount || 0),
     0
   );
 
   const totalPaid = filteredSalaries.reduce(
-    (sum, salary) => sum + Number(salary.paidAmount || 0),
+    (sum, salary) =>
+      sum + Number(salary.paidAmount || 0),
     0
   );
 
   const totalDue = filteredSalaries.reduce(
-    (sum, salary) => sum + Number(salary.dueAmount || 0),
+    (sum, salary) => sum + getDueAmount(salary),
     0
   );
 
   return (
-    <div className="min-h-screen space-y-6 bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen min-w-0 w-full space-y-5 bg-gray-50 p-3 sm:space-y-6 sm:p-5 lg:p-8">
+      {/* Print styles */}
+      <style>
+        {`
+          @media print {
+            body * {
+              visibility: hidden !important;
+            }
+
+            #salary-payslip,
+            #salary-payslip * {
+              visibility: visible !important;
+            }
+
+            #salary-payslip {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              border: none !important;
+              padding: 20px !important;
+            }
+
+            .no-print {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
+
+      {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-gray-800 sm:text-3xl">
             Salary Management
           </h1>
+
           <p className="mt-1 text-sm text-gray-500">
             Manage teacher salaries, payments and payslips.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <button
             type="button"
-            onClick={() => {
-              loadSalaries();
-              if (isAdmin) loadTeachers();
-            }}
+            onClick={refreshData}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+            className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
           >
-            <RefreshCw size={17} />
+            <RefreshCw
+              size={17}
+              className={loading ? "animate-spin" : ""}
+            />
             Refresh
           </button>
 
           {isAdmin && (
             <button
               type="button"
-              onClick={() => {
-                setError("");
-                setSuccess("");
-                setShowCreateModal(true);
-              }}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              onClick={openCreateModal}
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 sm:px-4"
             >
               <Plus size={18} />
               Add Salary
@@ -411,51 +503,60 @@ export default function Salary() {
         </div>
       </div>
 
-      {error && (
+      {/* Error */}
+      {error && !hasOpenModal && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+          className="break-words rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
         >
           {error}
         </div>
       )}
 
+      {/* Success */}
       {success && (
         <div
           role="status"
-          className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
+          className="break-words rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
         >
           {success}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         <SummaryCard
           title="Total Salary"
           amount={formatMoney(totalSalary)}
-          icon={<Wallet size={22} />}
+          icon={<Wallet size={20} />}
           color="blue"
         />
+
         <SummaryCard
           title="Total Paid"
           amount={formatMoney(totalPaid)}
-          icon={<CheckCircle size={22} />}
+          icon={<CheckCircle size={20} />}
           color="green"
         />
-        <SummaryCard
-          title="Total Due"
-          amount={formatMoney(totalDue)}
-          icon={<AlertCircle size={22} />}
-          color="red"
-        />
+
+        <div className="col-span-2 xl:col-span-1">
+          <SummaryCard
+            title="Total Due"
+            amount={formatMoney(totalDue)}
+            icon={<AlertCircle size={20} />}
+            color="red"
+          />
+        </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+      {/* Salary Table */}
+      <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5">
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <h2 className="text-lg font-bold text-gray-800">
               {isTeacher ? "My Salary History" : "Salary Records"}
             </h2>
+
             <p className="mt-1 text-sm text-gray-500">
               {filteredSalaries.length} record(s) found
             </p>
@@ -466,18 +567,19 @@ export default function Salary() {
               size={19}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
+
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search teacher, month or status..."
-              className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] text-left text-sm">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[850px] text-left text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-600">
                 <th className="px-4 py-3 font-semibold">Teacher</th>
@@ -486,23 +588,35 @@ export default function Salary() {
                 <th className="px-4 py-3 font-semibold">Paid</th>
                 <th className="px-4 py-3 font-semibold">Due</th>
                 <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+                <th className="px-4 py-3 text-right font-semibold">
+                  Actions
+                </th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-12 text-center text-gray-500"
+                  >
                     Loading salary records...
                   </td>
                 </tr>
               ) : filteredSalaries.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-12 text-center text-gray-500"
+                  >
                     <div className="flex flex-col items-center gap-2">
                       <Wallet size={32} />
-                      <p className="font-medium">No salary records found</p>
+
+                      <p className="font-medium">
+                        No salary records found
+                      </p>
+
                       <p className="text-xs">
                         {search
                           ? "Try another search term."
@@ -515,37 +629,47 @@ export default function Salary() {
                 filteredSalaries.map((salary) => {
                   const teacher = salary.teacher || {};
                   const status = getStatus(salary);
+                  const due = getDueAmount(salary);
 
                   return (
-                    <tr key={salary._id} className="transition hover:bg-gray-50">
+                    <tr
+                      key={salary._id}
+                      className="transition hover:bg-gray-50"
+                    >
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                             <Users size={18} />
                           </div>
-                          <div>
+
+                          <div className="min-w-0">
                             <p className="font-semibold text-gray-800">
                               {teacher.name || "Teacher"}
                             </p>
-                            <p className="mt-1 text-xs text-gray-500">
+
+                            <p className="mt-1 break-all text-xs text-gray-500">
                               {teacher.email || ""}
                             </p>
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-4 py-4 font-medium text-gray-700">
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-gray-700">
                         {salary.month}
                       </td>
-                      <td className="px-4 py-4 font-medium text-gray-800">
+
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-gray-800">
                         {formatMoney(salary.salaryAmount)}
                       </td>
-                      <td className="px-4 py-4 font-medium text-green-700">
+
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-green-700">
                         {formatMoney(salary.paidAmount)}
                       </td>
-                      <td className="px-4 py-4 font-medium text-red-600">
-                        {formatMoney(salary.dueAmount)}
+
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-red-600">
+                        {formatMoney(due)}
                       </td>
+
                       <td className="px-4 py-4">
                         <StatusBadge status={status} />
                       </td>
@@ -556,13 +680,16 @@ export default function Salary() {
                             type="button"
                             title="View payslip"
                             aria-label="View payslip"
-                            onClick={() => handleViewPayslip(salary._id)}
-                            className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
+                            disabled={payslipLoading}
+                            onClick={() =>
+                              handleViewPayslip(salary._id)
+                            }
+                            className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50 disabled:opacity-40"
                           >
                             <Eye size={17} />
                           </button>
 
-                          {isAdmin && Number(salary.dueAmount) > 0 && (
+                          {isAdmin && due > 0 && (
                             <button
                               type="button"
                               title="Record payment"
@@ -572,7 +699,7 @@ export default function Salary() {
                                 setPaidAmount("");
                                 setPaymentSalary(salary);
                               }}
-                              className="rounded-lg p-2 text-green-600 hover:bg-green-50"
+                              className="rounded-lg p-2 text-green-600 transition hover:bg-green-50"
                             >
                               <CreditCard size={17} />
                             </button>
@@ -583,10 +710,20 @@ export default function Salary() {
                               type="button"
                               title="Delete salary"
                               aria-label="Delete salary"
-                              onClick={() => handleDelete(salary._id)}
-                              className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                              disabled={!!deletingId}
+                              onClick={() =>
+                                handleDelete(salary._id)
+                              }
+                              className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                              <Trash2 size={17} />
+                              <Trash2
+                                size={17}
+                                className={
+                                  deletingId === salary._id
+                                    ? "animate-pulse"
+                                    : ""
+                                }
+                              />
                             </button>
                           )}
                         </div>
@@ -600,114 +737,155 @@ export default function Salary() {
         </div>
       </div>
 
+      {/* Create Salary Modal */}
       {showCreateModal && isAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="my-auto w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">Create Salary</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  Select a teacher and month. Fixed salary will be used automatically.
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-5">
+          <div className="my-auto flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 p-4 sm:p-5">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-gray-800 sm:text-xl">
+                  Create Salary
+                </h2>
+
+                <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+                  Select a teacher and month. Fixed salary will be
+                  used automatically.
                 </p>
               </div>
+
               <button
                 type="button"
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setForm(initialForm);
-                }}
+                onClick={closeCreateModal}
+                disabled={saving}
                 aria-label="Close modal"
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 disabled:opacity-50"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSalary} className="space-y-4">
-              <div>
-                <label htmlFor="teacher" className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Select Teacher *
-                </label>
-                <select
-                  id="teacher"
-                  name="teacher"
-                  value={form.teacher}
-                  onChange={handleFormChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">Choose a teacher</option>
-                  {teachers.map((teacher) => (
-                    <option key={teacher._id} value={teacher._id}>
-                      {teacher.name} ({teacher.email})
-                    </option>
-                  ))}
-                </select>
-
-                {teachers.length === 0 && (
-                  <p className="mt-1 text-xs text-amber-700">
-                    No teachers found. Check the teacher API and login as admin.
-                  </p>
+            <form
+              onSubmit={handleCreateSalary}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+                {error && (
+                  <div
+                    role="alert"
+                    className="break-words rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
+                    {error}
+                  </div>
                 )}
+
+                <div>
+                  <label
+                    htmlFor="teacher"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Select Teacher *
+                  </label>
+
+                  <select
+                    id="teacher"
+                    name="teacher"
+                    value={form.teacher}
+                    onChange={handleFormChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">Choose a teacher</option>
+
+                    {teachers.map((teacher) => (
+                      <option
+                        key={teacher._id}
+                        value={teacher._id}
+                      >
+                        {teacher.name} ({teacher.email})
+                      </option>
+                    ))}
+                  </select>
+
+                  {teachers.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      No teachers found. Check the teacher API and
+                      login as admin.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="month"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Salary Month *
+                  </label>
+
+                  <input
+                    id="month"
+                    type="month"
+                    name="month"
+                    value={form.month}
+                    onChange={handleFormChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Fixed Monthly Salary
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      selectedTeacher
+                        ? formatMoney(selectedTeacher.monthlySalary)
+                        : "Select a teacher"
+                    }
+                    readOnly
+                    className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700"
+                  />
+
+                  {selectedTeacher &&
+                    Number(selectedTeacher.monthlySalary || 0) <= 0 && (
+                      <p className="mt-1 text-xs text-red-600">
+                        Set this teacher's fixed salary in Teacher
+                        Management first.
+                      </p>
+                    )}
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="month" className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Salary Month *
-                </label>
-                <input
-                  id="month"
-                  type="month"
-                  name="month"
-                  value={form.month}
-                  onChange={handleFormChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Fixed Monthly Salary
-                </label>
-                <input
-                  type="text"
-                  value={
-                    selectedTeacher
-                      ? formatMoney(selectedTeacher.monthlySalary)
-                      : "Select a teacher"
-                  }
-                  readOnly
-                  className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-gray-700"
-                />
-                {selectedTeacher && Number(selectedTeacher.monthlySalary || 0) <= 0 && (
-                  <p className="mt-1 text-xs text-red-600">
-                    Set this teacher's fixed salary in Teacher Management first.
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setForm(initialForm);
-                  }}
-                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  onClick={closeCreateModal}
+                  disabled={saving}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   disabled={
                     saving ||
                     teachers.length === 0 ||
                     !selectedTeacher ||
-                    Number(selectedTeacher.monthlySalary || 0) <= 0
+                    Number(selectedTeacher?.monthlySalary || 0) <= 0
                   }
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
+                  {saving && (
+                    <RefreshCw
+                      size={16}
+                      className="animate-spin"
+                    />
+                  )}
+
                   {saving ? "Saving..." : "Create Salary"}
                 </button>
               </div>
@@ -716,79 +894,126 @@ export default function Salary() {
         </div>
       )}
 
+      {/* Record Payment Modal */}
       {paymentSalary && isAdmin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">Record Salary Payment</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  {paymentSalary.teacher?.name || "Teacher"} — {paymentSalary.month}
+        <div className="fixed inset-0 z-[110] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-5">
+          <div className="my-auto flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 p-4 sm:p-5">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-gray-800 sm:text-xl">
+                  Record Salary Payment
+                </h2>
+
+                <p className="mt-1 break-words text-xs text-gray-500 sm:text-sm">
+                  {paymentSalary.teacher?.name || "Teacher"} —{" "}
+                  {paymentSalary.month}
                 </p>
               </div>
+
               <button
                 type="button"
-                onClick={() => {
-                  setPaymentSalary(null);
-                  setPaidAmount("");
-                }}
+                onClick={closePaymentModal}
+                disabled={saving}
                 aria-label="Close payment modal"
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 disabled:opacity-50"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="mb-4 space-y-2 rounded-lg bg-gray-50 p-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Salary</span>
-                <span className="font-semibold">{formatMoney(paymentSalary.salaryAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Already Paid</span>
-                <span className="font-semibold text-green-700">{formatMoney(paymentSalary.paidAmount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Remaining Due</span>
-                <span className="font-semibold text-red-600">{formatMoney(paymentSalary.dueAmount)}</span>
-              </div>
-            </div>
+            <form
+              onSubmit={handlePayment}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+                {error && (
+                  <div
+                    role="alert"
+                    className="break-words rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                  >
+                    {error}
+                  </div>
+                )}
 
-            <form onSubmit={handlePayment} className="space-y-4">
-              <div>
-                <label htmlFor="paidAmount" className="mb-1.5 block text-sm font-medium text-gray-700">
-                  New Payment Amount (৳) *
-                </label>
-                <input
-                  id="paidAmount"
-                  type="number"
-                  value={paidAmount}
-                  onChange={(e) => setPaidAmount(e.target.value)}
-                  min="0.01"
-                  max={paymentSalary.dueAmount}
-                  step="0.01"
-                  required
-                  placeholder="Enter payment amount"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
+                <div className="space-y-3 rounded-lg bg-gray-50 p-4 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-600">
+                      Total Salary
+                    </span>
+
+                    <span className="font-semibold">
+                      {formatMoney(paymentSalary.salaryAmount)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-600">
+                      Already Paid
+                    </span>
+
+                    <span className="font-semibold text-green-700">
+                      {formatMoney(paymentSalary.paidAmount)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-600">
+                      Remaining Due
+                    </span>
+
+                    <span className="font-semibold text-red-600">
+                      {formatMoney(getDueAmount(paymentSalary))}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="paidAmount"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    New Payment Amount (৳) *
+                  </label>
+
+                  <input
+                    id="paidAmount"
+                    type="number"
+                    value={paidAmount}
+                    onChange={(e) =>
+                      setPaidAmount(e.target.value)
+                    }
+                    min="0.01"
+                    max={getDueAmount(paymentSalary)}
+                    step="0.01"
+                    required
+                    placeholder="Enter payment amount"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
                 <button
                   type="button"
-                  onClick={() => {
-                    setPaymentSalary(null);
-                    setPaidAmount("");
-                  }}
-                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  onClick={closePaymentModal}
+                  disabled={saving}
+                  className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 sm:w-auto"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
+                  {saving && (
+                    <RefreshCw
+                      size={16}
+                      className="animate-spin"
+                    />
+                  )}
+
                   {saving ? "Saving..." : "Save Payment"}
                 </button>
               </div>
@@ -797,94 +1022,159 @@ export default function Salary() {
         </div>
       )}
 
+      {/* Payslip Modal */}
       {payslip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4">
-          <div className="my-auto w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ReceiptText className="text-blue-600" size={24} />
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">Salary Payslip</h2>
-                  <p className="text-xs text-gray-500">Payment details</p>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-5">
+          <div className="my-auto flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="no-print flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 p-4 sm:p-5">
+              <div className="flex min-w-0 items-center gap-2">
+                <ReceiptText
+                  className="shrink-0 text-blue-600"
+                  size={24}
+                />
+
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold text-gray-800 sm:text-xl">
+                    Salary Payslip
+                  </h2>
+
+                  <p className="text-xs text-gray-500">
+                    Payment details
+                  </p>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setPayslip(null)}
                 aria-label="Close payslip"
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                className="shrink-0 rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div id="salary-payslip" className="space-y-4 rounded-xl border border-gray-200 p-4">
-              <div className="border-b border-dashed border-gray-200 pb-4">
-                <p className="text-xs text-gray-500">Payslip Number</p>
-                <p className="mt-1 break-all font-semibold text-gray-800">
-                  {payslip.paySlipNumber || "N/A"}
-                </p>
-              </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+              <div
+                id="salary-payslip"
+                className="space-y-4 rounded-xl border border-gray-200 p-4 sm:p-5"
+              >
+                <div className="border-b border-dashed border-gray-200 pb-4">
+                  <p className="text-xs text-gray-500">
+                    Payslip Number
+                  </p>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-gray-500">Teacher Name</p>
-                  <p className="mt-1 font-semibold text-gray-800">
-                    {payslip.teacher?.name || "Teacher"}
+                  <p className="mt-1 break-all font-semibold text-gray-800">
+                    {payslip.paySlipNumber || "N/A"}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <p className="mt-1 break-all font-medium text-gray-800">
-                    {payslip.teacher?.email || "N/A"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Salary Month</p>
-                  <p className="mt-1 font-semibold text-gray-800">{payslip.month}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Payment Date</p>
-                  <p className="mt-1 font-medium text-gray-800">
-                    {payslip.paymentDate
-                      ? new Date(payslip.paymentDate).toLocaleDateString()
-                      : "Not paid yet"}
-                  </p>
-                </div>
-              </div>
 
-              <div className="space-y-3 border-t border-dashed border-gray-200 pt-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Total Salary</span>
-                  <span className="font-semibold">{formatMoney(payslip.salaryAmount)}</span>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500">
+                      Teacher Name
+                    </p>
+
+                    <p className="mt-1 break-words font-semibold text-gray-800">
+                      {payslip.teacher?.name || "Teacher"}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-xs text-gray-500">Email</p>
+
+                    <p className="mt-1 break-all font-medium text-gray-800">
+                      {payslip.teacher?.email || "N/A"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-gray-500">
+                      Salary Month
+                    </p>
+
+                    <p className="mt-1 font-semibold text-gray-800">
+                      {payslip.month || "N/A"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-gray-500">
+                      Payment Date
+                    </p>
+
+                    <p className="mt-1 font-medium text-gray-800">
+                      {payslip.paymentDate
+                        ? new Date(
+                            payslip.paymentDate
+                          ).toLocaleDateString()
+                        : "Not paid yet"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Paid Amount</span>
-                  <span className="font-semibold text-green-700">{formatMoney(payslip.paidAmount)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Due Amount</span>
-                  <span className="font-semibold text-red-600">{formatMoney(payslip.dueAmount)}</span>
-                </div>
-                <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-                  <span className="font-medium text-gray-700">Status</span>
-                  <StatusBadge status={payslip.status} />
+
+                <div className="space-y-3 border-t border-dashed border-gray-200 pt-4">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-600">
+                      Total Salary
+                    </span>
+
+                    <span className="font-semibold">
+                      {formatMoney(payslip.salaryAmount)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-600">
+                      Paid Amount
+                    </span>
+
+                    <span className="font-semibold text-green-700">
+                      {formatMoney(payslip.paidAmount)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-gray-600">
+                      Due Amount
+                    </span>
+
+                    <span className="font-semibold text-red-600">
+                      {formatMoney(
+                        payslip.dueAmount ??
+                          Math.max(
+                            0,
+                            Number(payslip.salaryAmount || 0) -
+                              Number(payslip.paidAmount || 0)
+                          )
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                    <span className="font-medium text-gray-700">
+                      Status
+                    </span>
+
+                    <StatusBadge status={getStatus(payslip)} />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end gap-3">
+            <div className="no-print flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
               <button
                 type="button"
                 onClick={() => setPayslip(null)}
-                className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto"
               >
                 Close
               </button>
+
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 sm:w-auto"
               >
                 <Printer size={17} />
                 Print
