@@ -8,6 +8,11 @@ import {
   ClipboardList,
   RefreshCw,
   Users,
+  GraduationCap,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
 } from "lucide-react";
 import api from "../../services/api";
 
@@ -21,6 +26,8 @@ const EMPTY_FORM = {
   grade: "",
 };
 
+const ITEMS_PER_PAGE = 8;
+
 const getArray = (response) => {
   const data = response?.data?.data;
   return Array.isArray(data) ? data : [];
@@ -33,6 +40,7 @@ const getId = (item) => {
 
 const getName = (item, fallback = "N/A") => {
   if (!item) return fallback;
+
   if (typeof item === "string") return item;
 
   return (
@@ -41,6 +49,27 @@ const getName = (item, fallback = "N/A") => {
     item.className ||
     fallback
   );
+};
+
+const getClassName = (classItem) => {
+  if (!classItem) return "N/A";
+
+  if (typeof classItem === "string") return classItem;
+
+  return `${classItem.className || "N/A"}${
+    classItem.section ? ` - ${classItem.section}` : ""
+  }`;
+};
+
+const formatPercentage = (marks, total) => {
+  const obtained = Number(marks);
+  const maximum = Number(total);
+
+  if (!Number.isFinite(obtained) || maximum <= 0) {
+    return "0.0";
+  }
+
+  return ((obtained / maximum) * 100).toFixed(1);
 };
 
 export default function ResultsManagement() {
@@ -59,18 +88,12 @@ export default function ResultsManagement() {
   const [classFilter, setClassFilter] = useState("");
   const [examFilter, setExamFilter] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const [user] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("user") || "{}");
-    } catch {
-      return {};
-    }
-  });
-
-  
+  // Load teacher's assigned classes, subjects, students and results.
   const loadData = async () => {
     setLoading(true);
     setError("");
@@ -87,7 +110,7 @@ export default function ResultsManagement() {
       setClasses(teacherClasses);
       setSubjects(teacherSubjects);
 
-      // Get students from each assigned class.
+      // Fetch students from assigned classes.
       const studentResponses = await Promise.all(
         teacherClasses.map((item) =>
           api.get(`/attendance/students?classId=${item._id}`)
@@ -103,9 +126,10 @@ export default function ResultsManagement() {
       });
 
       const teacherStudents = Array.from(studentMap.values());
+
       setStudents(teacherStudents);
 
-      // Get results belonging to assigned students.
+      // Fetch results belonging to assigned students.
       const resultResponses = await Promise.all(
         teacherStudents.map((student) =>
           api.get(`/result/student-results/${student._id}`)
@@ -136,6 +160,11 @@ export default function ResultsManagement() {
     loadData();
   }, []);
 
+  // Reset pagination when filters change.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, classFilter, examFilter]);
+
   const openModal = () => {
     setForm(EMPTY_FORM);
     setError("");
@@ -148,6 +177,7 @@ export default function ResultsManagement() {
 
     setShowModal(false);
     setForm(EMPTY_FORM);
+    setError("");
   };
 
   const handleChange = (event) => {
@@ -198,9 +228,7 @@ export default function ResultsManagement() {
       totalMarks < 1 ||
       marks > totalMarks
     ) {
-      setError(
-        "Marks must be between 0 and total marks."
-      );
+      setError("Marks must be between 0 and total marks.");
       return;
     }
 
@@ -217,7 +245,7 @@ export default function ResultsManagement() {
       return;
     }
 
-    // Verify subject belongs to selected class.
+    // Verify selected subject belongs to selected class.
     const selectedSubject = subjects.find(
       (subject) =>
         subject._id === form.subjectId &&
@@ -260,6 +288,7 @@ export default function ResultsManagement() {
     }
   };
 
+  // Filter results.
   const filteredResults = useMemo(() => {
     return results.filter((result) => {
       const studentName = getName(result.studentId, "");
@@ -295,25 +324,51 @@ export default function ResultsManagement() {
     });
   }, [results, search, classFilter, examFilter]);
 
-  const examNames = [
-    ...new Set(
-      results.map((result) => result.examName).filter(Boolean)
-    ),
-  ];
+  // Exam filter options.
+  const examNames = useMemo(() => {
+    return [
+      ...new Set(
+        results.map((result) => result.examName).filter(Boolean)
+      ),
+    ];
+  }, [results]);
 
-  const averagePercentage =
-    results.length > 0
-      ? (
-          results.reduce((sum, result) => {
-            const total = Number(result.totalMarks);
-            const marks = Number(result.marks);
+  // Summary calculations.
+  const averagePercentage = useMemo(() => {
+    if (results.length === 0) return "0.0";
 
-            return total > 0
-              ? sum + (marks / total) * 100
-              : sum;
-          }, 0) / results.length
-        ).toFixed(1)
-      : "0.0";
+    const totalPercentage = results.reduce((sum, result) => {
+      return (
+        sum +
+        Number(
+          formatPercentage(result.marks, result.totalMarks)
+        )
+      );
+    }, 0);
+
+    return (totalPercentage / results.length).toFixed(1);
+  }, [results]);
+
+  const totalSubjects = new Set(
+    results.map((item) => getId(item.subjectId))
+  ).size;
+
+  // Pagination.
+  const totalPages = Math.ceil(
+    filteredResults.length / ITEMS_PER_PAGE
+  );
+
+  const safePage = Math.min(
+    currentPage,
+    Math.max(totalPages, 1)
+  );
+
+  const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
+
+  const visibleResults = filteredResults.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE
+  );
 
   const classStudents = students.filter(
     (student) => getId(student.classId) === form.classId
@@ -323,37 +378,54 @@ export default function ResultsManagement() {
     (subject) => getId(subject.classId) === form.classId
   );
 
+  const clearFilters = () => {
+    setSearch("");
+    setClassFilter("");
+    setExamFilter("");
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-5 lg:p-8">
+      <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
 
         {/* Heading */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 sm:text-3xl">
-              Result Management
-            </h1>
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                <GraduationCap size={22} />
+              </div>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Create and manage results for your assigned classes.
-            </p>
+              <div>
+                <h1 className="text-xl font-bold text-slate-800 sm:text-2xl lg:text-3xl">
+                  Result Management
+                </h1>
+
+                <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
+                  Manage examination results for your assigned classes.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={loadData}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none sm:px-4"
             >
-              <RefreshCw size={16} />
+              <RefreshCw
+                size={16}
+                className={loading ? "animate-spin" : ""}
+              />
               Refresh
             </button>
 
             <button
               type="button"
               onClick={openModal}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 sm:flex-none sm:px-4"
             >
               <Plus size={18} />
               Add Result
@@ -362,11 +434,12 @@ export default function ResultsManagement() {
         </div>
 
         {/* Alerts */}
-        {error && (
+        {error && !showModal && (
           <div
             role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"
           >
+            <FileText size={17} className="mt-0.5 shrink-0" />
             {error}
           </div>
         )}
@@ -374,56 +447,86 @@ export default function ResultsManagement() {
         {success && (
           <div
             role="status"
-            className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"
+            className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-700"
           >
             {success}
           </div>
         )}
 
-        {/* Summary */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Total Results</p>
-              <ClipboardList size={22} className="text-blue-600" />
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-5">
+
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm">
+                Total Results
+              </p>
+
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 sm:h-10 sm:w-10">
+                <ClipboardList size={19} />
+              </div>
             </div>
 
-            <p className="mt-3 text-3xl font-bold text-slate-800">
+            <p className="mt-3 text-2xl font-bold text-slate-800 sm:text-3xl">
               {results.length}
             </p>
-          </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">Subjects in Results</p>
-              <BookOpen size={22} className="text-violet-600" />
-            </div>
-
-            <p className="mt-3 text-3xl font-bold text-slate-800">
-              {
-                new Set(
-                  results.map((item) => getId(item.subjectId))
-                ).size
-              }
+            <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">
+              All examination records
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">
-                Average Percentage
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm">
+                Subjects in Results
               </p>
-              <Award size={22} className="text-emerald-600" />
+
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600 sm:h-10 sm:w-10">
+                <BookOpen size={19} />
+              </div>
             </div>
 
-            <p className="mt-3 text-3xl font-bold text-slate-800">
+            <p className="mt-3 text-2xl font-bold text-slate-800 sm:text-3xl">
+              {totalSubjects}
+            </p>
+
+            <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">
+              Different subjects
+            </p>
+          </div>
+
+          <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md lg:col-span-1 sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm">
+                Average Percentage
+              </p>
+
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-10 sm:w-10">
+                <Award size={19} />
+              </div>
+            </div>
+
+            <p className="mt-3 text-2xl font-bold text-slate-800 sm:text-3xl">
               {averagePercentage}%
+            </p>
+
+            <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">
+              Overall average result
             </p>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        {/* Search and Filters */}
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Filter size={17} className="text-blue-600" />
+
+            <h2 className="text-sm font-semibold text-slate-700">
+              Search & Filters
+            </h2>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="relative">
               <Search
@@ -436,20 +539,20 @@ export default function ResultsManagement() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search student, subject, exam..."
-                className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-blue-500"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             <select
               value={classFilter}
               onChange={(event) => setClassFilter(event.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">All My Classes</option>
 
               {classes.map((item) => (
                 <option key={item._id} value={item._id}>
-                  {item.className} - {item.section}
+                  {getClassName(item)}
                 </option>
               ))}
             </select>
@@ -457,7 +560,7 @@ export default function ResultsManagement() {
             <select
               value={examFilter}
               onChange={(event) => setExamFilter(event.target.value)}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             >
               <option value="">All Exams</option>
 
@@ -468,296 +571,510 @@ export default function ResultsManagement() {
               ))}
             </select>
           </div>
-        </div>
 
-        {/* Results table */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 p-12 text-slate-500">
-              <RefreshCw size={18} className="animate-spin" />
-              Loading results...
-            </div>
-          ) : filteredResults.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-12 text-center">
-              <Users size={38} className="text-slate-300" />
-
-              <h3 className="mt-3 font-semibold text-slate-700">
-                No results found
-              </h3>
-
-              <p className="mt-1 text-sm text-slate-500">
-                No results are available for your assigned classes.
+          {(search || classFilter || examFilter) && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500">
+                {filteredResults.length} matching result(s) found
               </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="bg-slate-100 text-xs uppercase text-slate-600">
-                  <tr>
-                    <th className="px-5 py-4">Student</th>
-                    <th className="px-5 py-4">Class</th>
-                    <th className="px-5 py-4">Subject</th>
-                    <th className="px-5 py-4">Exam</th>
-                    <th className="px-5 py-4">Marks</th>
-                    <th className="px-5 py-4">Percentage</th>
-                    <th className="px-5 py-4">Grade</th>
-                  </tr>
-                </thead>
 
-                <tbody className="divide-y divide-slate-100">
-                  {filteredResults.map((result) => {
-                    const total = Number(result.totalMarks);
-                    const marks = Number(result.marks);
-
-                    const percentage =
-                      total > 0
-                        ? ((marks / total) * 100).toFixed(1)
-                        : "0.0";
-
-                    return (
-                      <tr
-                        key={result._id}
-                        className="hover:bg-slate-50"
-                      >
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-slate-800">
-                            {getName(result.studentId)}
-                          </p>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {result.studentId?.email || ""}
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {result.classId?.className || "N/A"}
-                          {result.classId?.section
-                            ? ` - ${result.classId.section}`
-                            : ""}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {getName(result.subjectId)}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {result.examName}
-                        </td>
-
-                        <td className="px-5 py-4 font-medium text-slate-700">
-                          {marks} / {total}
-                        </td>
-
-                        <td className="px-5 py-4 text-slate-600">
-                          {percentage}%
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                            {result.grade || "Not assigned"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs font-semibold text-blue-600 transition hover:text-blue-800"
+              >
+                Clear Filters
+              </button>
             </div>
           )}
         </div>
 
-        <p className="text-xs text-slate-500">
-          Showing {filteredResults.length} of {results.length} result records.
+        {/* Results Table */}
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+
+          <div className="flex flex-col gap-1 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div>
+              <h2 className="font-semibold text-slate-800">
+                Examination Results
+              </h2>
+
+              <p className="mt-1 text-xs text-slate-500">
+                View results of students in your assigned classes.
+              </p>
+            </div>
+
+            <span className="mt-2 w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 sm:mt-0">
+              {filteredResults.length} Records
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="flex min-h-[250px] flex-col items-center justify-center gap-3 text-slate-500">
+              <RefreshCw
+                size={25}
+                className="animate-spin text-blue-600"
+              />
+
+              <p className="text-sm">Loading results...</p>
+            </div>
+          ) : filteredResults.length === 0 ? (
+            <div className="flex min-h-[250px] flex-col items-center justify-center p-8 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <ClipboardList size={27} />
+              </div>
+
+              <h3 className="mt-4 font-semibold text-slate-700">
+                No Results Found
+              </h3>
+
+              <p className="mt-1 max-w-sm text-sm text-slate-500">
+                No examination results are available for your selected classes or filters.
+              </p>
+
+              {(search || classFilter || examFilter) && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="mt-4 text-sm font-semibold text-blue-600 hover:text-blue-800"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[850px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Student
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Class
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Subject
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Exam
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Marks
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Percentage
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Grade
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-100">
+                    {visibleResults.map((result) => {
+                      const percentage = formatPercentage(
+                        result.marks,
+                        result.totalMarks
+                      );
+
+                      return (
+                        <tr
+                          key={result._id}
+                          className="transition-colors hover:bg-blue-50/40"
+                        >
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                                {getName(result.studentId, "?")
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-800">
+                                  {getName(result.studentId)}
+                                </p>
+
+                                <p className="mt-0.5 max-w-[180px] truncate text-xs text-slate-500">
+                                  {result.studentId?.email || ""}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4 text-slate-600">
+                            {getClassName(result.classId)}
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4 font-medium text-slate-700">
+                            {getName(result.subjectId)}
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4 text-slate-600">
+                            {result.examName || "N/A"}
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4 font-semibold text-slate-700">
+                            {result.marks} / {result.totalMarks}
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4">
+                            <span className="font-semibold text-slate-700">
+                              {percentage}%
+                            </span>
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4">
+                            <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                              {result.grade || "Not assigned"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <p className="text-xs text-slate-500">
+                  Showing{" "}
+                  <span className="font-semibold text-slate-700">
+                    {startIndex + 1}
+                  </span>
+                  {" - "}
+                  <span className="font-semibold text-slate-700">
+                    {Math.min(
+                      startIndex + ITEMS_PER_PAGE,
+                      filteredResults.length
+                    )}
+                  </span>
+                  {" of "}
+                  <span className="font-semibold text-slate-700">
+                    {filteredResults.length}
+                  </span>
+                  {" results"}
+                </p>
+
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((previous) =>
+                        Math.max(previous - 1, 1)
+                      )
+                    }
+                    disabled={safePage === 1}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronLeft size={15} />
+                    Previous
+                  </button>
+
+                  <span className="whitespace-nowrap text-xs font-medium text-slate-600">
+                    Page {safePage} of {Math.max(totalPages, 1)}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage((previous) =>
+                        Math.min(previous + 1, totalPages)
+                      )
+                    }
+                    disabled={safePage >= totalPages}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <p className="text-xs text-slate-400">
+          Showing {filteredResults.length} of {results.length} total result records.
         </p>
       </div>
 
-      {/* Create Result Modal */}
+      {/* Add Result Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
-          <div className="my-auto w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 p-5">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">
-                  Add New Result
-                </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-5">
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Enter the examination details below.
-                </p>
+            {/* Modal Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                  <Plus size={21} />
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">
+                    Add New Result
+                  </h2>
+
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Enter the examination details below.
+                  </p>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
               >
-                <X size={20} />
+                <X size={21} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 p-5">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Modal Form */}
+            <form
+              onSubmit={handleSubmit}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="space-y-5 overflow-y-auto p-4 sm:p-6">
 
-                {/* Class */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Class *
-                  </label>
-
-                  <select
-                    name="classId"
-                    value={form.classId}
-                    onChange={handleClassChange}
-                    required
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm"
+                {error && (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
                   >
-                    <option value="">Select class</option>
+                    {error}
+                  </div>
+                )}
 
-                    {classes.map((item) => (
-                      <option key={item._id} value={item._id}>
-                        {item.className} - {item.section}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Student */}
+                {/* Class & Student */}
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Student *
-                  </label>
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <Users size={17} className="text-blue-600" />
+                    Student Information
+                  </h3>
 
-                  <select
-                    name="studentId"
-                    value={form.studentId}
-                    onChange={handleChange}
-                    required
-                    disabled={!form.classId || saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm disabled:bg-slate-100"
-                  >
-                    <option value="">Select student</option>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-                    {classStudents.map((student) => (
-                      <option key={student._id} value={student._id}>
-                        {student.name}
-                      </option>
-                    ))}
-                  </select>
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Class <span className="text-red-500">*</span>
+                      </label>
+
+                      <select
+                        name="classId"
+                        value={form.classId}
+                        onChange={handleClassChange}
+                        required
+                        disabled={saving}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                      >
+                        <option value="">Select class</option>
+
+                        {classes.map((item) => (
+                          <option key={item._id} value={item._id}>
+                            {getClassName(item)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Student <span className="text-red-500">*</span>
+                      </label>
+
+                      <select
+                        name="studentId"
+                        value={form.studentId}
+                        onChange={handleChange}
+                        required
+                        disabled={!form.classId || saving}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                      >
+                        <option value="">
+                          {form.classId
+                            ? "Select student"
+                            : "Select class first"}
+                        </option>
+
+                        {classStudents.map((student) => (
+                          <option
+                            key={student._id}
+                            value={student._id}
+                          >
+                            {student.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      {form.classId && classStudents.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600">
+                          No students found in this class.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Subject <span className="text-red-500">*</span>
+                      </label>
+
+                      <select
+                        name="subjectId"
+                        value={form.subjectId}
+                        onChange={handleChange}
+                        required
+                        disabled={!form.classId || saving}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                      >
+                        <option value="">
+                          {form.classId
+                            ? "Select subject"
+                            : "Select class first"}
+                        </option>
+
+                        {classSubjects.map((subject) => (
+                          <option
+                            key={subject._id}
+                            value={subject._id}
+                          >
+                            {subject.subjectName}
+                          </option>
+                        ))}
+                      </select>
+
+                      {form.classId && classSubjects.length === 0 && (
+                        <p className="mt-1 text-xs text-amber-600">
+                          No subjects assigned to this class.
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Subject */}
+                <div className="border-t border-slate-100" />
+
+                {/* Exam Information */}
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Subject *
-                  </label>
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <BookOpen size={17} className="text-blue-600" />
+                    Examination Information
+                  </h3>
 
-                  <select
-                    name="subjectId"
-                    value={form.subjectId}
-                    onChange={handleChange}
-                    required
-                    disabled={!form.classId || saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm disabled:bg-slate-100"
-                  >
-                    <option value="">Select subject</option>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-                    {classSubjects.map((subject) => (
-                      <option key={subject._id} value={subject._id}>
-                        {subject.subjectName}
-                      </option>
-                    ))}
-                  </select>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Exam Name <span className="text-red-500">*</span>
+                      </label>
+
+                      <input
+                        type="text"
+                        name="examName"
+                        value={form.examName}
+                        onChange={handleChange}
+                        placeholder="e.g. First Term Examination"
+                        required
+                        disabled={saving}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Obtained Marks <span className="text-red-500">*</span>
+                      </label>
+
+                      <input
+                        type="number"
+                        name="marks"
+                        value={form.marks}
+                        onChange={handleChange}
+                        placeholder="Enter obtained marks"
+                        min="0"
+                        max={form.totalMarks || undefined}
+                        step="any"
+                        required
+                        disabled={saving}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Total Marks <span className="text-red-500">*</span>
+                      </label>
+
+                      <input
+                        type="number"
+                        name="totalMarks"
+                        value={form.totalMarks}
+                        onChange={handleChange}
+                        placeholder="Enter total marks"
+                        min="1"
+                        step="any"
+                        required
+                        disabled={saving}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                        Grade <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+
+                      <input
+                        type="text"
+                        name="grade"
+                        value={form.grade}
+                        onChange={handleChange}
+                        placeholder="e.g. A+, A, B"
+                        disabled={saving}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Exam Name */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Exam Name *
-                  </label>
+                {/* Percentage Preview */}
+                {form.marks !== "" &&
+                  form.totalMarks !== "" &&
+                  Number(form.totalMarks) > 0 &&
+                  Number(form.marks) >= 0 && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                      <p className="text-xs font-medium text-blue-700">
+                        Result Percentage Preview
+                      </p>
 
-                  <input
-                    type="text"
-                    name="examName"
-                    value={form.examName}
-                    onChange={handleChange}
-                    placeholder="Enter exam name"
-                    required
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Marks */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Obtained Marks *
-                  </label>
-
-                  <input
-                    type="number"
-                    name="marks"
-                    value={form.marks}
-                    onChange={handleChange}
-                    min="0"
-                    max={form.totalMarks || undefined}
-                    step="any"
-                    required
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Total Marks */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Total Marks *
-                  </label>
-
-                  <input
-                    type="number"
-                    name="totalMarks"
-                    value={form.totalMarks}
-                    onChange={handleChange}
-                    min="1"
-                    step="any"
-                    required
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Grade */}
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Grade (Optional)
-                  </label>
-
-                  <input
-                    type="text"
-                    name="grade"
-                    value={form.grade}
-                    onChange={handleChange}
-                    placeholder="Enter grade"
-                    disabled={saving}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500"
-                  />
-                </div>
+                      <p className="mt-1 text-2xl font-bold text-blue-700">
+                        {formatPercentage(
+                          form.marks,
+                          form.totalMarks
+                        )}
+                        %
+                      </p>
+                    </div>
+                  )}
               </div>
 
-              {error && (
-                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+              {/* Modal Footer */}
+              <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -765,9 +1082,19 @@ export default function ResultsManagement() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? "Saving..." : "Save Result"}
+                  {saving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={17} />
+                      Save Result
+                    </>
+                  )}
                 </button>
               </div>
             </form>
