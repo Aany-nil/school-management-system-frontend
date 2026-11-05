@@ -42,7 +42,6 @@ const getId = (item) => {
 
 const getName = (item, fallback = "N/A") => {
   if (!item) return fallback;
-
   if (typeof item === "string") return item;
 
   return (
@@ -55,7 +54,6 @@ const getName = (item, fallback = "N/A") => {
 
 const getClassName = (classItem) => {
   if (!classItem) return "N/A";
-
   if (typeof classItem === "string") return classItem;
 
   return `${classItem.className || "N/A"}${
@@ -166,17 +164,23 @@ export default function ResultsManagement() {
     loadData();
   }, []);
 
-  // Load school information for marksheet preview.
+  // Load shared school information for teacher marksheet.
+  // Admin, Teacher and Student can access this endpoint.
   useEffect(() => {
     const loadSchoolInfo = async () => {
       try {
-        const response = await api.get("/settings/setting");
+        const response = await api.get("/settings/school-info");
 
         setSchoolInfo(
           response.data?.data?.school || {}
         );
       } catch (err) {
-        console.log("School information could not be loaded.");
+        console.error(
+          "School information could not be loaded:",
+          err.response?.data?.message || err.message
+        );
+
+        setSchoolInfo({});
       }
     };
 
