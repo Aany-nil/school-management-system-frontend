@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Printer,
 } from "lucide-react";
 
 import api from "../../services/api";
@@ -111,6 +112,8 @@ export default function AttendanceManagement() {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
 
+  const [schoolInfo, setSchoolInfo] = useState({});
+
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -138,6 +141,7 @@ export default function AttendanceManagement() {
   const canCreate = isTeacher;
   const canEdit = isTeacher;
   const canDelete = isAdmin;
+  const canPrint = isAdmin || isTeacher;
 
   // Load classes according to user role
   const loadOptions = useCallback(async () => {
@@ -234,6 +238,28 @@ export default function AttendanceManagement() {
       setLoading(false);
     }
   }, [isStudent, filterClass, filterDate]);
+
+  // Load school information for Admin and Teacher
+  useEffect(() => {
+    const loadSchoolInfo = async () => {
+      try {
+        const response = await api.get("/settings/school-info");
+
+        setSchoolInfo(response.data?.data?.school || {});
+      } catch (err) {
+        console.error(
+          "Could not load school information:",
+          getErrorMessage(err)
+        );
+
+        setSchoolInfo({});
+      }
+    };
+
+    if (canPrint) {
+      loadSchoolInfo();
+    }
+  }, [canPrint]);
 
   useEffect(() => {
     loadOptions();
@@ -427,8 +453,155 @@ export default function AttendanceManagement() {
     (item) => item.status === "Late"
   ).length;
 
+  // Print attendance report
+  const handlePrint = () => {
+    if (!canPrint) return;
+
+    if (filteredAttendance.length === 0) {
+      setError("No attendance records available to print.");
+      return;
+    }
+
+    window.print();
+  };
+
+  const selectedClass = classes.find(
+    (item) => item._id === filterClass
+  );
+
   return (
     <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-8">
+
+      <style>{`
+        .attendance-print-area {
+          display: none;
+        }
+
+        @media print {
+          @page {
+            size: landscape;
+            margin: 12mm;
+          }
+
+          body * {
+            visibility: hidden !important;
+          }
+
+          .attendance-print-area,
+          .attendance-print-area * {
+            visibility: visible !important;
+          }
+
+          .attendance-print-area {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            color: #111827;
+            background: white;
+            font-family: Arial, sans-serif;
+          }
+
+          .print-school-header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 12px;
+          }
+
+          .print-school-logo {
+            width: 65px;
+            height: 65px;
+            object-fit: contain;
+            margin: 0 auto 8px;
+          }
+
+          .print-school-header h1 {
+            font-size: 23px;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+
+          .print-school-header p {
+            font-size: 11px;
+            margin: 3px 0;
+          }
+
+          .print-school-header h2 {
+            font-size: 17px;
+            font-weight: bold;
+            margin-top: 12px;
+          }
+
+          .print-report-info {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 15px;
+            font-size: 11px;
+          }
+
+          .print-summary {
+            display: flex;
+            justify-content: space-around;
+            gap: 12px;
+            border: 1px solid #aaa;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            font-weight: bold;
+          }
+
+          .print-attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+          }
+
+          .print-attendance-table th,
+          .print-attendance-table td {
+            border: 1px solid #777;
+            padding: 7px;
+            text-align: left;
+          }
+
+          .print-attendance-table th {
+            background: #e5e7eb !important;
+            font-weight: bold;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          .print-attendance-table tr {
+            page-break-inside: avoid;
+          }
+
+          .print-footer {
+            margin-top: 35px;
+            font-size: 10px;
+          }
+
+          .print-footer > p {
+            text-align: center;
+            margin-bottom: 35px;
+          }
+
+          .print-signatures {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 30px;
+          }
+
+          .print-signatures span {
+            border-top: 1px solid #333;
+            padding-top: 7px;
+            min-width: 150px;
+            text-align: center;
+          }
+        }
+      `}</style>
+
       <div className="mx-auto w-full max-w-7xl min-w-0 space-y-5 sm:space-y-6">
 
         {/* Header */}
@@ -451,21 +624,35 @@ export default function AttendanceManagement() {
             </p>
           </div>
 
-          {canCreate && (
-            <button
-              type="button"
-              onClick={openCreateModal}
-              disabled={optionsLoading || classes.length === 0}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-            >
-              {optionsLoading ? (
-                <LoaderCircle size={18} className="animate-spin" />
-              ) : (
-                <Plus size={18} />
-              )}
-              Add Attendance
-            </button>
-          )}
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {canPrint && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={loading || filteredAttendance.length === 0}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                <Printer size={18} />
+                Print Report
+              </button>
+            )}
+
+            {canCreate && (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                disabled={optionsLoading || classes.length === 0}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              >
+                {optionsLoading ? (
+                  <LoaderCircle size={18} className="animate-spin" />
+                ) : (
+                  <Plus size={18} />
+                )}
+                Add Attendance
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Alerts */}
@@ -761,6 +948,120 @@ export default function AttendanceManagement() {
         </div>
       </div>
 
+      {/* Print Only Attendance Report */}
+      <div className="attendance-print-area">
+        <div className="print-school-header">
+          {schoolInfo.schoolLogo && (
+            <img
+              src={schoolInfo.schoolLogo}
+              alt="School Logo"
+              className="print-school-logo"
+            />
+          )}
+
+          <h1>{schoolInfo.schoolName || "School Name"}</h1>
+
+          {schoolInfo.schoolAddress && (
+            <p>{schoolInfo.schoolAddress}</p>
+          )}
+
+          <p>
+            {schoolInfo.schoolEmail || ""}
+            {schoolInfo.schoolPhone
+              ? ` | ${schoolInfo.schoolPhone}`
+              : ""}
+          </p>
+
+          <p>
+            Academic Year: {schoolInfo.academicYear || "—"}
+            {" | "}
+            Session: {schoolInfo.currentSession || "—"}
+          </p>
+
+          <h2>ATTENDANCE REPORT</h2>
+        </div>
+
+        <div className="print-report-info">
+          <p>
+            <strong>Report Date:</strong>{" "}
+            {new Date().toLocaleDateString("en-GB")}
+          </p>
+
+          <p>
+            <strong>Class:</strong>{" "}
+            {filterClass
+              ? selectedClass
+                ? `${selectedClass.className} ${
+                    selectedClass.section || ""
+                  }`
+                : "Selected Class"
+              : "All Classes"}
+          </p>
+
+          <p>
+            <strong>Attendance Date:</strong>{" "}
+            {filterDate ? formatDate(filterDate) : "All Dates"}
+          </p>
+        </div>
+
+        <div className="print-summary">
+          <p>Total Records: {filteredAttendance.length}</p>
+          <p>Present: {presentCount}</p>
+          <p>Absent: {absentCount}</p>
+          <p>Late: {lateCount}</p>
+        </div>
+
+        <table className="print-attendance-table">
+          <thead>
+            <tr>
+              <th>SL</th>
+              <th>Student Name</th>
+              <th>Email</th>
+              <th>Class</th>
+              <th>Date</th>
+              <th>Status</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredAttendance.map((record, index) => (
+              <tr key={record._id}>
+                <td>{index + 1}</td>
+
+                <td>
+                  {record.student?.name || "Unknown Student"}
+                </td>
+
+                <td>{record.student?.email || "—"}</td>
+
+                <td>
+                  {record.classId?.className || "Unknown"}
+                  {record.classId?.section
+                    ? ` - ${record.classId.section}`
+                    : ""}
+                </td>
+
+                <td>{formatDate(record.date)}</td>
+
+                <td>{record.status}</td>
+
+                <td>{record.remarks || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="print-footer">
+          <p>Generated from School Management System</p>
+
+          <div className="print-signatures">
+            <span>Class Teacher Signature</span>
+            <span>Principal Signature</span>
+          </div>
+        </div>
+      </div>
+
       {/* Create / Edit Modal */}
       {modalOpen && canCreate && (
         <div
@@ -812,7 +1113,6 @@ export default function AttendanceManagement() {
               onSubmit={handleSubmit}
               className="flex min-h-0 flex-1 flex-col"
             >
-              {/* Scrollable Form Body */}
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-5 sm:p-6">
                 {error && (
                   <div
@@ -973,7 +1273,7 @@ export default function AttendanceManagement() {
                 </div>
               </div>
 
-              {/* Fixed Modal Footer */}
+              {/* Modal Footer */}
               <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white p-4 sm:flex-row sm:justify-end sm:px-6">
                 <button
                   type="button"
