@@ -10,6 +10,7 @@ import {
   Pencil,
   Trash2,
   Clock,
+  Printer,
 } from "lucide-react";
 import api from "../../services/api";
 
@@ -119,6 +120,15 @@ function formatTime(time) {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function SummaryCard({ title, value, description, icon, color }) {
   const colors = {
     blue: "bg-blue-50 text-blue-600",
@@ -156,6 +166,7 @@ export default function Routine() {
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [schoolInfo, setSchoolInfo] = useState({});
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -180,7 +191,7 @@ export default function Routine() {
           return String(user.role).toLowerCase();
         }
       } catch {
-        // Ignore invalid JSON.
+
       }
     }
 
@@ -188,6 +199,7 @@ export default function Routine() {
   });
 
   const isAdmin = role === "admin";
+
 
   const fetchRoutines = useCallback(async () => {
     setLoading(true);
@@ -203,6 +215,7 @@ export default function Routine() {
       setLoading(false);
     }
   }, []);
+
 
   const fetchOptions = useCallback(async () => {
     if (!isAdmin) return;
@@ -242,11 +255,30 @@ export default function Routine() {
     }
   }, [isAdmin]);
 
+
+  const fetchSchoolInfo = useCallback(async () => {
+    try {
+      const response = await api.get("/settings/school-info");
+
+      const data =
+        response.data?.data?.school ||
+        response.data?.school ||
+        response.data?.data ||
+        response.data;
+
+      setSchoolInfo(data || {});
+    } catch (error) {
+      setSchoolInfo({});
+    }
+  }, []);
+
   useEffect(() => {
     fetchRoutines();
     fetchOptions();
-  }, [fetchRoutines, fetchOptions]);
+    fetchSchoolInfo();
+  }, [fetchRoutines, fetchOptions, fetchSchoolInfo]);
 
+  
   const resetForm = () => {
     setForm(INITIAL_FORM);
     setEditingId(null);
@@ -254,6 +286,7 @@ export default function Routine() {
     setError("");
   };
 
+  
   const openCreateForm = () => {
     setError("");
     setSuccess("");
@@ -262,6 +295,7 @@ export default function Routine() {
     setShowForm(true);
   };
 
+  
   const openEditForm = (routine) => {
     setError("");
     setSuccess("");
@@ -279,6 +313,7 @@ export default function Routine() {
     setShowForm(true);
   };
 
+  
   const handleChange = (event) => {
     const { name, value } = event.target;
 
@@ -288,6 +323,7 @@ export default function Routine() {
     }));
   };
 
+  
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -342,6 +378,7 @@ export default function Routine() {
     }
   };
 
+  
   const handleDelete = async (routineId) => {
     if (!routineId) return;
 
@@ -366,6 +403,277 @@ export default function Routine() {
     }
   };
 
+  
+  const handlePrint = () => {
+    if (!isAdmin) {
+      setError("Only admin can print the school routine.");
+      return;
+    }
+
+    if (!routines.length) {
+      setError("No routine available to print.");
+      return;
+    }
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=1100,height=750"
+    );
+
+    if (!printWindow) {
+      setError("Please allow pop-ups to print the routine.");
+      return;
+    }
+
+    const schoolName =
+      schoolInfo.schoolName || schoolInfo.name || "My School";
+
+    const schoolAddress =
+      schoolInfo.schoolAddress || schoolInfo.address || "";
+
+    const schoolPhone = schoolInfo.schoolPhone || "";
+    const schoolEmail = schoolInfo.schoolEmail || "";
+    const logo = schoolInfo.logo || schoolInfo.schoolLogo || "";
+
+    const printDate = new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+    const sortedRoutines = [...routines].sort((a, b) => {
+      const dayOrder = DAYS.findIndex(
+        (day) => day.value === String(a.day || "").toLowerCase()
+      );
+
+      const otherDayOrder = DAYS.findIndex(
+        (day) => day.value === String(b.day || "").toLowerCase()
+      );
+
+      if (dayOrder !== otherDayOrder) {
+        return dayOrder - otherDayOrder;
+      }
+
+      return String(a.startTime || "").localeCompare(
+        String(b.startTime || "")
+      );
+    });
+
+    const rows = sortedRoutines
+      .map(
+        (routine, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHTML(getClassLabel(routine.classId))}</td>
+            <td>${escapeHTML(getSubjectLabel(routine.subjectId))}</td>
+            <td>${escapeHTML(getTeacherLabel(routine.teacherId))}</td>
+            <td>${escapeHTML(formatDay(routine.day))}</td>
+            <td>${escapeHTML(formatTime(routine.startTime))}</td>
+            <td>${escapeHTML(formatTime(routine.endTime))}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>School Routine Report</title>
+          <meta charset="UTF-8" />
+
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 15mm;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: Arial, sans-serif;
+              color: #1e293b;
+              margin: 0;
+              padding: 10px;
+            }
+
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #bdccec;
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+
+            .logo {
+              width: 65px;
+              height: 65px;
+              object-fit: contain;
+              margin-bottom: 8px;
+            }
+
+            h1 {
+              margin: 5px 0;
+              font-size: 25px;
+            }
+
+            .school-info {
+              font-size: 12px;
+              color: #475569;
+              line-height: 1.7;
+            }
+
+            .report-title {
+              text-align: center;
+              margin: 20px 0;
+            }
+
+            .report-title h2 {
+              font-size: 19px;
+              margin-bottom: 5px;
+            }
+
+            .meta {
+              display: flex;
+              justify-content: space-between;
+              margin: 15px 0;
+              font-size: 12px;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+            }
+
+            th, td {
+              border: 1px solid #202328;
+              padding: 10px 8px;
+              text-align: left;
+              font-size: 11px;
+            }
+
+            th {
+              background: #eff6ff;
+              color: #808286;
+              font-weight: bold;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            tr {
+              page-break-inside: avoid;
+            }
+
+            .summary {
+              margin-top: 15px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+
+            .signature {
+              margin-top: 65px;
+              display: flex;
+              justify-content: flex-end;
+            }
+
+            .signature div {
+              width: 190px;
+              text-align: center;
+              border-top: 1px solid #334155;
+              padding-top: 8px;
+              font-size: 12px;
+            }
+
+            @media print {
+              body {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+
+          <div class="header">
+
+            ${
+              logo
+                ? `<img class="logo" src="${escapeHTML(logo)}" alt="School Logo" />`
+                : ""
+            }
+
+            <h1>${escapeHTML(schoolName)}</h1>
+
+            <div class="school-info">
+              ${schoolAddress ? escapeHTML(schoolAddress) + "<br />" : ""}
+              ${schoolPhone ? "Phone: " + escapeHTML(schoolPhone) + "<br />" : ""}
+              ${schoolEmail ? "Email: " + escapeHTML(schoolEmail) : ""}
+            </div>
+
+          </div>
+
+          <div class="report-title">
+            <h2>SCHOOL ROUTINE REPORT</h2>
+            <p>Weekly Class Schedule</p>
+          </div>
+
+          <div class="meta">
+            <span>Total Scheduled Classes: ${routines.length}</span>
+            <span>Print Date: ${escapeHTML(printDate)}</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>SL</th>
+                <th>Class / Section</th>
+                <th>Subject</th>
+                <th>Teacher</th>
+                <th>Day</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+
+          <div class="summary">
+            Total Routines: ${routines.length}
+          </div>
+
+          <div class="signature">
+            <div>Authorized Signature</div>
+          </div>
+
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    const images = Array.from(printWindow.document.images);
+
+    const waitForImages = images.map((image) => {
+      if (image.complete) return Promise.resolve();
+
+      return new Promise((resolve) => {
+        image.onload = resolve;
+        image.onerror = resolve;
+      });
+    });
+
+    Promise.all(waitForImages).then(() => {
+      printWindow.focus();
+      printWindow.print();
+    });
+  };
+
   const availableDays = new Set(
     routines.map((routine) => String(routine.day || "").toLowerCase())
   ).size;
@@ -373,13 +681,16 @@ export default function Routine() {
   const refreshAll = () => {
     fetchRoutines();
     fetchOptions();
+    fetchSchoolInfo();
   };
 
   return (
     <div className="min-h-screen w-full min-w-0 bg-slate-50 p-3 sm:p-5 lg:p-8">
       <div className="mx-auto w-full max-w-7xl min-w-0">
-        {/* Page Header */}
+
+        {/* PAGE HEADER */}
         <div className="mb-6 flex flex-col justify-between gap-4 sm:mb-8 sm:flex-row sm:items-center">
+
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2 text-xs font-medium text-blue-600 sm:text-sm">
               <span className="h-2 w-2 rounded-full bg-blue-600" />
@@ -395,7 +706,9 @@ export default function Routine() {
             </p>
           </div>
 
+          {/* HEADER BUTTONS */}
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap">
+
             <button
               type="button"
               onClick={refreshAll}
@@ -412,17 +725,30 @@ export default function Routine() {
             {isAdmin && (
               <button
                 type="button"
+                onClick={handlePrint}
+                disabled={loading || routines.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-500 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+              >
+                <Printer size={16} />
+                Print Routine
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                type="button"
                 onClick={openCreateForm}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:px-5 sm:text-sm"
+                className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:col-span-1 sm:px-5 sm:text-sm"
               >
                 <Plus size={17} />
                 Add Routine
               </button>
             )}
+
           </div>
         </div>
 
-        {/* Page Alerts */}
+        {/* PAGE ALERTS */}
         {error && !showForm && (
           <div
             role="alert"
@@ -443,8 +769,9 @@ export default function Routine() {
           </div>
         )}
 
-        {/* Summary Cards */}
+        {/* SUMMARY CARDS */}
         <div className="mb-6 grid grid-cols-2 gap-3 sm:mb-8 sm:gap-5">
+
           <SummaryCard
             title="Total Routines"
             value={routines.length}
@@ -460,15 +787,19 @@ export default function Routine() {
             icon={<CheckCircle size={22} />}
             color="green"
           />
+
         </div>
 
-        {/* Routine Table */}
+        {/* ROUTINE TABLE */}
         <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
           <div className="flex flex-col justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:px-6 sm:py-5">
+
             <div>
               <h2 className="text-base font-bold text-slate-900 sm:text-lg">
                 Class Schedule
               </h2>
+
               <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                 {routines.length} schedule{routines.length === 1 ? "" : "s"} found
               </p>
@@ -477,17 +808,23 @@ export default function Routine() {
             <span className="inline-flex w-fit items-center rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
               Weekly timetable
             </span>
+
           </div>
 
           {loading ? (
+
             <div className="flex flex-col items-center justify-center px-5 py-16">
               <RefreshCw size={32} className="animate-spin text-blue-600" />
+
               <p className="mt-4 text-sm text-slate-500">
                 Loading routines...
               </p>
             </div>
+
           ) : routines.length === 0 ? (
+
             <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
+
               <div className="mb-4 rounded-2xl bg-slate-100 p-4 text-slate-400">
                 <CalendarDays size={36} />
               </div>
@@ -512,10 +849,15 @@ export default function Routine() {
                   Add First Routine
                 </button>
               )}
+
             </div>
+
           ) : (
+
             <div className="w-full overflow-x-auto">
+
               <table className="w-full min-w-[850px] text-left text-sm">
+
                 <thead>
                   <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                     <th className="px-4 py-4 font-semibold sm:px-5">#</th>
@@ -525,6 +867,7 @@ export default function Routine() {
                     <th className="px-4 py-4 font-semibold sm:px-5">Day</th>
                     <th className="px-4 py-4 font-semibold sm:px-5">Start Time</th>
                     <th className="px-4 py-4 font-semibold sm:px-5">End Time</th>
+
                     {isAdmin && (
                       <th className="px-4 py-4 font-semibold sm:px-5">Actions</th>
                     )}
@@ -532,11 +875,13 @@ export default function Routine() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
+
                   {routines.map((routine, index) => (
                     <tr
                       key={routine._id || index}
                       className="transition hover:bg-blue-50/40"
                     >
+
                       <td className="px-4 py-4 text-slate-400 sm:px-5">
                         {String(index + 1).padStart(2, "0")}
                       </td>
@@ -576,7 +921,9 @@ export default function Routine() {
 
                       {isAdmin && (
                         <td className="px-4 py-4 sm:px-5">
+
                           <div className="flex items-center gap-2">
+
                             <button
                               type="button"
                               onClick={() => openEditForm(routine)}
@@ -601,24 +948,34 @@ export default function Routine() {
                                 <Trash2 size={15} />
                               )}
                             </button>
+
                           </div>
+
                         </td>
                       )}
+
                     </tr>
                   ))}
+
                 </tbody>
+
               </table>
+
             </div>
+
           )}
 
           <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3 text-xs text-slate-400 sm:px-6">
             School Routine Management
           </div>
+
         </section>
+
       </div>
 
       {/* ADD / EDIT ROUTINE POPUP */}
       {showForm && isAdmin && (
+
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5"
           onMouseDown={(event) => {
@@ -627,15 +984,19 @@ export default function Routine() {
             }
           }}
         >
+
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="routine-modal-title"
             className="my-auto flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
           >
-            {/* Modal Header */}
+
+            {/* MODAL HEADER */}
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
+
               <div className="flex min-w-0 items-center gap-3">
+
                 <div className="hidden rounded-xl bg-blue-50 p-3 text-blue-600 sm:block">
                   {editingId ? <Pencil size={21} /> : <CalendarDays size={21} />}
                 </div>
@@ -647,12 +1008,14 @@ export default function Routine() {
                   >
                     {editingId ? "Edit Routine" : "Add New Routine"}
                   </h2>
+
                   <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                     {editingId
                       ? "Update the class schedule details."
                       : "Add a new class schedule to your school."}
                   </p>
                 </div>
+
               </div>
 
               <button
@@ -664,15 +1027,18 @@ export default function Routine() {
               >
                 <X size={21} />
               </button>
+
             </div>
 
-            {/* Modal Form - Scrollable */}
+            {/* MODAL FORM */}
             <form
               id="routine-form"
               onSubmit={handleSubmit}
               className="flex min-h-0 flex-1 flex-col"
             >
+
               <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+
                 {error && (
                   <div
                     role="alert"
@@ -687,16 +1053,23 @@ export default function Routine() {
                   <p className="text-xs font-semibold text-blue-800 sm:text-sm">
                     Routine Information
                   </p>
+
                   <p className="mt-1 text-xs text-blue-600">
                     Select the class, subject, teacher and schedule time.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+
+                  {/* CLASS */}
                   <div>
-                    <label htmlFor="classId" className="mb-2 block text-sm font-semibold text-slate-700">
+                    <label
+                      htmlFor="classId"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Class <span className="text-red-500">*</span>
                     </label>
+
                     <select
                       id="classId"
                       name="classId"
@@ -706,12 +1079,14 @@ export default function Routine() {
                       className={inputClass}
                     >
                       <option value="">Select class</option>
+
                       {classes.map((item) => (
                         <option key={item._id} value={item._id}>
                           {getClassLabel(item)}
                         </option>
                       ))}
                     </select>
+
                     {classes.length === 0 && (
                       <p className="mt-1.5 text-xs text-amber-600">
                         No classes loaded. Refresh or check the API response.
@@ -719,10 +1094,15 @@ export default function Routine() {
                     )}
                   </div>
 
+                  {/* SUBJECT */}
                   <div>
-                    <label htmlFor="subjectId" className="mb-2 block text-sm font-semibold text-slate-700">
+                    <label
+                      htmlFor="subjectId"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Subject <span className="text-red-500">*</span>
                     </label>
+
                     <select
                       id="subjectId"
                       name="subjectId"
@@ -732,12 +1112,14 @@ export default function Routine() {
                       className={inputClass}
                     >
                       <option value="">Select subject</option>
+
                       {subjects.map((item) => (
                         <option key={item._id} value={item._id}>
                           {getSubjectLabel(item)}
                         </option>
                       ))}
                     </select>
+
                     {subjects.length === 0 && (
                       <p className="mt-1.5 text-xs text-amber-600">
                         No subjects loaded. Refresh or check the API response.
@@ -745,10 +1127,15 @@ export default function Routine() {
                     )}
                   </div>
 
+                  {/* TEACHER */}
                   <div>
-                    <label htmlFor="teacherId" className="mb-2 block text-sm font-semibold text-slate-700">
+                    <label
+                      htmlFor="teacherId"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Teacher <span className="text-red-500">*</span>
                     </label>
+
                     <select
                       id="teacherId"
                       name="teacherId"
@@ -758,12 +1145,14 @@ export default function Routine() {
                       className={inputClass}
                     >
                       <option value="">Select teacher</option>
+
                       {teachers.map((item) => (
                         <option key={item._id} value={item._id}>
                           {getTeacherLabel(item)}
                         </option>
                       ))}
                     </select>
+
                     {teachers.length === 0 && (
                       <p className="mt-1.5 text-xs text-amber-600">
                         No teachers loaded. Refresh or check the API response.
@@ -771,10 +1160,15 @@ export default function Routine() {
                     )}
                   </div>
 
+                  {/* DAY */}
                   <div>
-                    <label htmlFor="day" className="mb-2 block text-sm font-semibold text-slate-700">
+                    <label
+                      htmlFor="day"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Day <span className="text-red-500">*</span>
                     </label>
+
                     <select
                       id="day"
                       name="day"
@@ -791,10 +1185,15 @@ export default function Routine() {
                     </select>
                   </div>
 
+                  {/* START TIME */}
                   <div>
-                    <label htmlFor="startTime" className="mb-2 block text-sm font-semibold text-slate-700">
+                    <label
+                      htmlFor="startTime"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       Start Time <span className="text-red-500">*</span>
                     </label>
+
                     <input
                       id="startTime"
                       name="startTime"
@@ -806,10 +1205,15 @@ export default function Routine() {
                     />
                   </div>
 
+                  {/* END TIME */}
                   <div>
-                    <label htmlFor="endTime" className="mb-2 block text-sm font-semibold text-slate-700">
+                    <label
+                      htmlFor="endTime"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
                       End Time <span className="text-red-500">*</span>
                     </label>
+
                     <input
                       id="endTime"
                       name="endTime"
@@ -820,11 +1224,14 @@ export default function Routine() {
                       className={inputClass}
                     />
                   </div>
+
                 </div>
+
               </div>
 
-              {/* Fixed Modal Footer */}
+              {/* MODAL FOOTER */}
               <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white p-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
+
                 <button
                   type="button"
                   onClick={resetForm}
@@ -851,11 +1258,17 @@ export default function Routine() {
                     </>
                   )}
                 </button>
+
               </div>
+
             </form>
+
           </section>
+
         </div>
+
       )}
+
     </div>
   );
 }

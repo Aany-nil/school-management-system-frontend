@@ -13,6 +13,8 @@ import {
   MapPin,
   FileText,
   Hash,
+  Printer,
+  AlertCircle,
 } from "lucide-react";
 
 import api from "../../services/api";
@@ -20,6 +22,8 @@ import api from "../../services/api";
 const Students = () => {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [schoolInfo, setSchoolInfo] = useState({});
+
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +34,51 @@ const Students = () => {
   const [selectedClasses, setSelectedClasses] = useState({});
   const [assigningId, setAssigningId] = useState("");
 
-  // Fetch Students
+  
+
+
+
+  const formatDate = (date) => {
+    if (!date) return "N/A";
+
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const escapeHTML = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (char) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      };
+
+      return entities[char];
+    });
+
+  const getStoredUser = () => {
+    try {
+      const storedUser =
+        localStorage.getItem("tasmina_user") ||
+        localStorage.getItem("user");
+
+      if (!storedUser) return {};
+
+      const parsed = JSON.parse(storedUser);
+
+      return parsed?.user || parsed?.data?.user || parsed || {};
+    } catch {
+      return {};
+    }
+  };
+
+  
+
   const fetchStudents = async () => {
     try {
       setLoading(true);
@@ -39,15 +87,18 @@ const Students = () => {
       const response = await api.get("/student/all-students");
 
       const studentData =
-        response.data.students ||
-        response.data.data ||
+        response.data?.students ||
+        response.data?.data?.students ||
+        response.data?.data ||
         [];
 
-      setStudents(studentData);
+      const list = Array.isArray(studentData) ? studentData : [];
+
+      setStudents(list);
 
       const classSelections = {};
 
-      studentData.forEach((student) => {
+      list.forEach((student) => {
         classSelections[student._id] =
           student.classId?._id || "";
       });
@@ -65,28 +116,48 @@ const Students = () => {
     }
   };
 
-  // Fetch Classes
+  
+
+
   const fetchClasses = async () => {
     try {
       const response = await api.get("/class/allclasses");
 
       const classData =
-        response.data.classes ||
-        response.data.data ||
+        response.data?.classes ||
+        response.data?.data?.classes ||
+        response.data?.data ||
         [];
 
-      setClasses(classData);
+      setClasses(Array.isArray(classData) ? classData : []);
     } catch (err) {
       console.error("Fetch classes error:", err);
+    }
+  };
+
+
+
+  const fetchSchoolInfo = async () => {
+    try {
+      const response = await api.get("/settings/school-info");
+
+      const data = response.data?.data || response.data;
+
+      setSchoolInfo(data?.school || data || {});
+    } catch (err) {
+      console.log("School information could not be loaded:", err);
     }
   };
 
   useEffect(() => {
     fetchStudents();
     fetchClasses();
+    fetchSchoolInfo();
   }, []);
 
-  // Assign Class
+ 
+
+
   const handleAssignClass = async (studentId) => {
     const classId = selectedClasses[studentId];
 
@@ -112,7 +183,6 @@ const Students = () => {
 
       await fetchStudents();
 
-      // Update selected student details if modal is open
       if (selectedStudent?._id === studentId) {
         setSelectedStudent(response.data?.data || selectedStudent);
       }
@@ -128,40 +198,320 @@ const Students = () => {
     }
   };
 
-  // Search Students
+
+
   const filteredStudents = students.filter((student) => {
-    const searchValue = search.toLowerCase();
+    const searchValue = search.toLowerCase().trim();
 
     return (
       student.name?.toLowerCase().includes(searchValue) ||
       student.email?.toLowerCase().includes(searchValue) ||
-      student.rollNumber?.toLowerCase().includes(searchValue) ||
-      student.classId?.className?.toLowerCase().includes(searchValue) ||
-      student.classId?.section?.toLowerCase().includes(searchValue)
+      String(student.rollNumber || "")
+        .toLowerCase()
+        .includes(searchValue) ||
+      student.classId?.className
+        ?.toLowerCase()
+        .includes(searchValue) ||
+      student.classId?.section
+        ?.toLowerCase()
+        .includes(searchValue)
     );
   });
 
-  // Format Date
-  const formatDate = (date) => {
-    if (!date) return "N/A";
 
-    return new Date(date).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+
+  const handlePrint = () => {
+    const currentUser = getStoredUser();
+
+    const role =
+      currentUser.role ||
+      localStorage.getItem("role") ||
+      "";
+
+    if (role !== "admin") {
+      setError("Only Admin can print the Student List.");
+      return;
+    }
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=1000,height=750"
+    );
+
+    if (!printWindow) {
+      setError("Please allow popups to print the Student List.");
+      return;
+    }
+
+    const schoolName = escapeHTML(
+      schoolInfo.schoolName ||
+        schoolInfo.name ||
+        "My School"
+    );
+
+    const schoolAddress = escapeHTML(
+      schoolInfo.schoolAddress ||
+        schoolInfo.address ||
+        ""
+    );
+
+    const schoolPhone = escapeHTML(
+      schoolInfo.schoolPhone || ""
+    );
+
+    const schoolEmail = escapeHTML(
+      schoolInfo.schoolEmail || ""
+    );
+
+    const logo = schoolInfo.logo || schoolInfo.schoolLogo || "";
+
+    const safeLogo = /^https?:\/\//i.test(logo)
+      ? escapeHTML(logo)
+      : "";
+
+    const rows = filteredStudents
+      .map((student, index) => {
+        const className = student.classId?.className || "Not Assigned";
+        const section = student.classId?.section || "N/A";
+        const academicYear = student.classId?.academicYear || "N/A";
+
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHTML(student.name || "N/A")}</td>
+            <td>${escapeHTML(student.email || "N/A")}</td>
+            <td>${escapeHTML(className)}</td>
+            <td>${escapeHTML(section)}</td>
+            <td>${escapeHTML(student.rollNumber || "Not Assigned")}</td>
+            <td>${escapeHTML(academicYear)}</td>
+            <td>${escapeHTML(formatDate(student.createdAt))}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const printDate = new Date().toLocaleDateString("en-BD");
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <title>Student List Report</title>
+
+        <style>
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: Arial, sans-serif;
+            color: #222;
+            margin: 0;
+            padding: 20px;
+          }
+
+          .school-header {
+            text-align: center;
+            border-bottom: 2px solid #222;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+          }
+
+          .school-header img {
+            width: 65px;
+            height: 65px;
+            object-fit: contain;
+            margin-bottom: 8px;
+          }
+
+          .school-header h1 {
+            margin: 5px 0;
+            font-size: 25px;
+          }
+
+          .school-header p {
+            margin: 4px 0;
+            font-size: 12px;
+          }
+
+          .report-title {
+            text-align: center;
+            margin: 20px 0;
+          }
+
+          .report-title h2 {
+            margin: 0 0 8px;
+            font-size: 20px;
+          }
+
+          .report-title p {
+            margin: 0;
+            font-size: 12px;
+          }
+
+          .report-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 12px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+          }
+
+          th, td {
+            border: 1px solid #777;
+            padding: 8px 6px;
+            font-size: 9px;
+            text-align: left;
+            vertical-align: middle;
+          }
+
+          th {
+            background: #eeeeee;
+            font-weight: bold;
+          }
+
+          .summary {
+            margin-top: 15px;
+            font-size: 13px;
+            font-weight: bold;
+          }
+
+          .signature {
+            margin-top: 75px;
+            display: flex;
+            justify-content: flex-end;
+          }
+
+          .signature div {
+            width: 190px;
+            border-top: 1px solid #222;
+            text-align: center;
+            padding-top: 8px;
+            font-size: 12px;
+          }
+
+          @page {
+            size: A4 landscape;
+            margin: 12mm;
+          }
+
+          @media print {
+            body {
+              padding: 0;
+            }
+
+            tr {
+              page-break-inside: avoid;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+
+        <div class="school-header">
+          ${
+            safeLogo
+              ? `<img src="${safeLogo}" alt="School Logo" />`
+              : ""
+          }
+
+          <h1>${schoolName}</h1>
+
+          ${schoolAddress ? `<p>${schoolAddress}</p>` : ""}
+          ${schoolPhone ? `<p>Phone: ${schoolPhone}</p>` : ""}
+          ${schoolEmail ? `<p>Email: ${schoolEmail}</p>` : ""}
+        </div>
+
+        <div class="report-title">
+          <h2>STUDENT LIST REPORT</h2>
+          <p>Academic Student Information</p>
+        </div>
+
+        <div class="report-info">
+          <span>Total Students: ${filteredStudents.length}</span>
+          <span>Print Date: ${printDate}</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>SL</th>
+              <th>Student Name</th>
+              <th>Email</th>
+              <th>Class</th>
+              <th>Section</th>
+              <th>Roll Number</th>
+              <th>Academic Year</th>
+              <th>Registered Date</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${
+              rows ||
+              `<tr><td colspan="8" style="text-align:center">No students found</td></tr>`
+            }
+          </tbody>
+        </table>
+
+        <div class="summary">
+          Total Students: ${filteredStudents.length}
+        </div>
+
+        <div class="signature">
+          <div>Authorized Signature</div>
+        </div>
+
+        <script>
+          window.onload = function () {
+            const images = Array.from(document.images);
+
+            Promise.all(
+              images.map((img) => {
+                if (img.complete) return Promise.resolve();
+
+                return new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                });
+              })
+            ).then(() => {
+              window.print();
+            });
+          };
+        </script>
+
+      </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
-  // Close Modal
+
   const closeModal = () => {
     setSelectedStudent(null);
   };
+
+
 
   return (
     <div className="min-h-screen w-full min-w-0 bg-gray-50 p-3 text-gray-700 sm:p-5 lg:p-8">
 
       {/* Header */}
+
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
         <div>
           <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
             Student Management
@@ -172,27 +522,46 @@ const Students = () => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            fetchStudents();
-            fetchClasses();
-          }}
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-        >
-          <RefreshCw
-            size={17}
-            className={loading ? "animate-spin" : ""}
-          />
-          Refresh
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+
+          <button
+            type="button"
+            onClick={() => {
+              fetchStudents();
+              fetchClasses();
+            }}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <RefreshCw
+              size={17}
+              className={loading ? "animate-spin" : ""}
+            />
+            Refresh
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrint}
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-600 disabled:opacity-50 sm:w-auto"
+          >
+            <Printer size={17} />
+            Print Student List
+          </button>
+
+        </div>
+
       </div>
 
       {/* Messages */}
+
       {error && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-          <span>{error}</span>
+          <span className="flex items-center gap-2">
+            <AlertCircle size={17} />
+            {error}
+          </span>
 
           <button
             type="button"
@@ -219,9 +588,9 @@ const Students = () => {
       )}
 
       {/* Summary Cards */}
+
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
 
-        {/* Total Students */}
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -240,7 +609,6 @@ const Students = () => {
           </div>
         </div>
 
-        {/* Assigned Students */}
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -250,9 +618,7 @@ const Students = () => {
 
               <h2 className="mt-2 text-xl font-bold text-gray-800 sm:text-2xl">
                 {
-                  students.filter(
-                    (student) => student.classId
-                  ).length
+                  students.filter((student) => student.classId).length
                 }
               </h2>
             </div>
@@ -263,7 +629,6 @@ const Students = () => {
           </div>
         </div>
 
-        {/* Available Classes */}
         <div className="col-span-2 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-1">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -285,9 +650,11 @@ const Students = () => {
       </div>
 
       {/* Student List */}
+
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
 
         <div className="border-b border-gray-100 p-4 sm:p-5">
+
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
             <div>
@@ -316,10 +683,13 @@ const Students = () => {
             </div>
 
           </div>
+
         </div>
 
         {/* Table */}
+
         <div className="w-full overflow-x-auto">
+
           <table className="w-full min-w-[1150px] text-left">
 
             <thead className="bg-gray-50">
@@ -335,6 +705,7 @@ const Students = () => {
             </thead>
 
             <tbody className="divide-y divide-gray-100">
+
               {loading ? (
                 <tr>
                   <td
@@ -372,9 +743,12 @@ const Students = () => {
                     key={student._id}
                     className="transition-colors hover:bg-gray-50"
                   >
+
                     {/* Student */}
+
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
+
                         {student.profilePicture ? (
                           <img
                             src={student.profilePicture}
@@ -396,10 +770,12 @@ const Students = () => {
                             Student
                           </p>
                         </div>
+
                       </div>
                     </td>
 
                     {/* Email */}
+
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Mail size={15} className="shrink-0 text-gray-400" />
@@ -411,9 +787,11 @@ const Students = () => {
                     </td>
 
                     {/* Assigned Class */}
+
                     <td className="px-5 py-4">
                       {student.classId ? (
                         <div className="flex flex-col items-start gap-1">
+
                           <span className="inline-flex whitespace-nowrap rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
                             {student.classId.className || "N/A"}
                           </span>
@@ -425,6 +803,7 @@ const Students = () => {
                           <span className="text-xs text-gray-400">
                             {student.classId.academicYear || ""}
                           </span>
+
                         </div>
                       ) : (
                         <span className="inline-flex whitespace-nowrap rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
@@ -434,6 +813,7 @@ const Students = () => {
                     </td>
 
                     {/* Roll Number */}
+
                     <td className="px-5 py-4">
                       {student.rollNumber ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
@@ -448,8 +828,10 @@ const Students = () => {
                     </td>
 
                     {/* Assign Class */}
+
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
+
                         <select
                           value={selectedClasses[student._id] || ""}
                           onChange={(e) =>
@@ -474,9 +856,7 @@ const Students = () => {
 
                         <button
                           type="button"
-                          onClick={() =>
-                            handleAssignClass(student._id)
-                          }
+                          onClick={() => handleAssignClass(student._id)}
                           disabled={
                             assigningId === student._id ||
                             !selectedClasses[student._id] ||
@@ -488,10 +868,12 @@ const Students = () => {
                             ? "Saving..."
                             : "Assign"}
                         </button>
+
                       </div>
                     </td>
 
                     {/* Registered */}
+
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 whitespace-nowrap text-sm text-gray-500">
                         <CalendarDays size={15} className="text-gray-400" />
@@ -500,6 +882,7 @@ const Students = () => {
                     </td>
 
                     {/* Action */}
+
                     <td className="px-5 py-4 text-center">
                       <button
                         type="button"
@@ -510,15 +893,21 @@ const Students = () => {
                         View Details
                       </button>
                     </td>
+
                   </tr>
                 ))
               )}
+
             </tbody>
 
           </table>
+
         </div>
 
+        {/* Table Footer */}
+
         <div className="flex flex-col gap-2 border-t border-gray-100 px-4 py-4 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+
           <p>
             Showing{" "}
             <span className="font-semibold text-gray-700">
@@ -532,23 +921,28 @@ const Students = () => {
           </p>
 
           <p>Student Management</p>
+
         </div>
 
       </div>
 
       {/* Student Details Modal */}
+
       {selectedStudent && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-[2px] sm:p-5"
           onClick={closeModal}
         >
+
           <div
             className="my-auto flex max-h-[94dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:max-w-lg"
             onClick={(e) => e.stopPropagation()}
           >
 
             {/* Modal Header */}
+
             <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3.5 sm:px-6 sm:py-4">
+
               <div>
                 <h2 className="text-base font-bold text-gray-800 sm:text-lg">
                   Student Profile
@@ -567,12 +961,15 @@ const Students = () => {
               >
                 <X size={19} />
               </button>
+
             </div>
 
             {/* Scrollable Modal Body */}
+
             <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
 
               {/* Profile Header */}
+
               <div className="flex flex-col items-center rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-5 text-center sm:py-6">
 
                 {selectedStudent.profilePicture ? (
@@ -596,7 +993,6 @@ const Students = () => {
                   Student
                 </span>
 
-                {/* Roll Number Badge */}
                 <div className="mt-3 rounded-lg bg-white px-4 py-2">
                   <p className="text-[11px] font-medium text-gray-500">
                     Roll Number
@@ -606,9 +1002,11 @@ const Students = () => {
                     {selectedStudent.rollNumber || "Not Assigned"}
                   </p>
                 </div>
+
               </div>
 
               {/* Information Heading */}
+
               <div className="mb-3 mt-5 flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
                   <FileText size={15} />
@@ -620,9 +1018,11 @@ const Students = () => {
               </div>
 
               {/* Information Cards */}
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
                 {/* Email */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <Mail size={17} />
@@ -637,6 +1037,7 @@ const Students = () => {
                 </div>
 
                 {/* Registration Date */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <CalendarDays size={17} />
@@ -651,6 +1052,7 @@ const Students = () => {
                 </div>
 
                 {/* Student ID */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <Hash size={17} />
@@ -665,6 +1067,7 @@ const Students = () => {
                 </div>
 
                 {/* Roll Number */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <GraduationCap size={18} />
@@ -679,6 +1082,7 @@ const Students = () => {
                 </div>
 
                 {/* Class */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <GraduationCap size={18} />
@@ -688,12 +1092,12 @@ const Students = () => {
                   </div>
 
                   <p className="break-words text-sm font-medium text-gray-800">
-                    {selectedStudent.classId?.className ||
-                      "Not Assigned"}
+                    {selectedStudent.classId?.className || "Not Assigned"}
                   </p>
                 </div>
 
                 {/* Section */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <Users size={17} />
@@ -708,6 +1112,7 @@ const Students = () => {
                 </div>
 
                 {/* Academic Year */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <CalendarDays size={17} />
@@ -722,6 +1127,7 @@ const Students = () => {
                 </div>
 
                 {/* Address */}
+
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
                     <MapPin size={17} />
@@ -738,6 +1144,7 @@ const Students = () => {
               </div>
 
               {/* Bio */}
+
               <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                 <div className="mb-2 flex items-center gap-2 text-blue-600">
                   <FileText size={17} />
@@ -754,6 +1161,7 @@ const Students = () => {
             </div>
 
             {/* Modal Footer */}
+
             <div className="shrink-0 border-t border-gray-100 bg-white p-3.5 sm:px-6 sm:py-4">
               <button
                 type="button"
@@ -765,6 +1173,7 @@ const Students = () => {
             </div>
 
           </div>
+
         </div>
       )}
 
