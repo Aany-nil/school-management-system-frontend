@@ -12,6 +12,7 @@ import {
   CheckCircle,
   MapPin,
   FileText,
+  Hash,
 } from "lucide-react";
 
 import api from "../../services/api";
@@ -99,14 +100,22 @@ const Students = () => {
       setError("");
       setSuccess("");
 
-      await api.patch(
+      const response = await api.patch(
         `/student/assign-class/${studentId}`,
         { classId }
       );
 
-      setSuccess("Class assigned successfully!");
+      setSuccess(
+        response.data?.message ||
+          "Class and roll number assigned successfully!"
+      );
 
       await fetchStudents();
+
+      // Update selected student details if modal is open
+      if (selectedStudent?._id === studentId) {
+        setSelectedStudent(response.data?.data || selectedStudent);
+      }
     } catch (err) {
       console.error("Assign class error:", err);
 
@@ -125,7 +134,10 @@ const Students = () => {
 
     return (
       student.name?.toLowerCase().includes(searchValue) ||
-      student.email?.toLowerCase().includes(searchValue)
+      student.email?.toLowerCase().includes(searchValue) ||
+      student.rollNumber?.toLowerCase().includes(searchValue) ||
+      student.classId?.className?.toLowerCase().includes(searchValue) ||
+      student.classId?.section?.toLowerCase().includes(searchValue)
     );
   });
 
@@ -156,7 +168,7 @@ const Students = () => {
           </h1>
 
           <p className="mt-1 text-sm text-gray-500">
-            Manage students and assign their classes.
+            Manage students and assign their classes and roll numbers.
           </p>
         </div>
 
@@ -209,6 +221,7 @@ const Students = () => {
       {/* Summary Cards */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3">
 
+        {/* Total Students */}
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -227,6 +240,7 @@ const Students = () => {
           </div>
         </div>
 
+        {/* Assigned Students */}
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -249,6 +263,7 @@ const Students = () => {
           </div>
         </div>
 
+        {/* Available Classes */}
         <div className="col-span-2 rounded-xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5 lg:col-span-1">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -295,7 +310,7 @@ const Students = () => {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or email..."
+                placeholder="Search name, email, roll or class..."
                 className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -305,13 +320,14 @@ const Students = () => {
 
         {/* Table */}
         <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-left">
+          <table className="w-full min-w-[1150px] text-left">
 
             <thead className="bg-gray-50">
               <tr className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-5 py-4">Student</th>
                 <th className="px-5 py-4">Email</th>
                 <th className="px-5 py-4">Assigned Class</th>
+                <th className="px-5 py-4">Roll Number</th>
                 <th className="px-5 py-4">Assign Class</th>
                 <th className="px-5 py-4">Registered</th>
                 <th className="px-5 py-4 text-center">Action</th>
@@ -322,7 +338,7 @@ const Students = () => {
               {loading ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="px-5 py-12 text-center text-sm text-gray-500"
                   >
                     Loading students...
@@ -331,7 +347,7 @@ const Students = () => {
               ) : filteredStudents.length === 0 ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="px-5 py-12 text-center"
                   >
                     <div className="flex flex-col items-center">
@@ -356,6 +372,7 @@ const Students = () => {
                     key={student._id}
                     className="transition-colors hover:bg-gray-50"
                   >
+                    {/* Student */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         {student.profilePicture ? (
@@ -382,6 +399,7 @@ const Students = () => {
                       </div>
                     </td>
 
+                    {/* Email */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Mail size={15} className="shrink-0 text-gray-400" />
@@ -392,13 +410,22 @@ const Students = () => {
                       </div>
                     </td>
 
+                    {/* Assigned Class */}
                     <td className="px-5 py-4">
                       {student.classId ? (
-                        <span className="inline-flex whitespace-nowrap rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-                          {student.classId.className ||
-                            student.classId.name ||
-                            "Assigned"}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="inline-flex whitespace-nowrap rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                            {student.classId.className || "N/A"}
+                          </span>
+
+                          <span className="text-xs text-gray-500">
+                            Section {student.classId.section || "N/A"}
+                          </span>
+
+                          <span className="text-xs text-gray-400">
+                            {student.classId.academicYear || ""}
+                          </span>
+                        </div>
                       ) : (
                         <span className="inline-flex whitespace-nowrap rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
                           Not Assigned
@@ -406,6 +433,21 @@ const Students = () => {
                       )}
                     </td>
 
+                    {/* Roll Number */}
+                    <td className="px-5 py-4">
+                      {student.rollNumber ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">
+                          <Hash size={13} />
+                          {student.rollNumber}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-gray-400">
+                          Not Assigned
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Assign Class */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
                         <select
@@ -416,7 +458,7 @@ const Students = () => {
                               [student._id]: e.target.value,
                             }))
                           }
-                          className="w-36 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-500 sm:w-40"
+                          className="w-44 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-500"
                         >
                           <option value="">Select Class</option>
 
@@ -425,7 +467,7 @@ const Students = () => {
                               key={classItem._id}
                               value={classItem._id}
                             >
-                              {classItem.className || classItem.name}
+                              {classItem.className} - Section {classItem.section} ({classItem.academicYear})
                             </option>
                           ))}
                         </select>
@@ -449,6 +491,7 @@ const Students = () => {
                       </div>
                     </td>
 
+                    {/* Registered */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 whitespace-nowrap text-sm text-gray-500">
                         <CalendarDays size={15} className="text-gray-400" />
@@ -456,6 +499,7 @@ const Students = () => {
                       </div>
                     </td>
 
+                    {/* Action */}
                     <td className="px-5 py-4 text-center">
                       <button
                         type="button"
@@ -492,7 +536,7 @@ const Students = () => {
 
       </div>
 
-      {/* Improved Responsive Student Details Modal */}
+      {/* Student Details Modal */}
       {selectedStudent && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-3 backdrop-blur-[2px] sm:p-5"
@@ -551,6 +595,17 @@ const Students = () => {
                   <GraduationCap size={14} />
                   Student
                 </span>
+
+                {/* Roll Number Badge */}
+                <div className="mt-3 rounded-lg bg-white px-4 py-2">
+                  <p className="text-[11px] font-medium text-gray-500">
+                    Roll Number
+                  </p>
+
+                  <p className="text-lg font-bold text-blue-700">
+                    {selectedStudent.rollNumber || "Not Assigned"}
+                  </p>
+                </div>
               </div>
 
               {/* Information Heading */}
@@ -595,6 +650,34 @@ const Students = () => {
                   </p>
                 </div>
 
+                {/* Student ID */}
+                <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+                  <div className="mb-2 flex items-center gap-2 text-blue-600">
+                    <Hash size={17} />
+                    <span className="text-xs font-semibold text-gray-500">
+                      Student ID
+                    </span>
+                  </div>
+
+                  <p className="break-all text-xs font-medium text-gray-800">
+                    {selectedStudent._id || "N/A"}
+                  </p>
+                </div>
+
+                {/* Roll Number */}
+                <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+                  <div className="mb-2 flex items-center gap-2 text-blue-600">
+                    <GraduationCap size={18} />
+                    <span className="text-xs font-semibold text-gray-500">
+                      Roll Number
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-bold text-gray-800">
+                    {selectedStudent.rollNumber || "Not Assigned"}
+                  </p>
+                </div>
+
                 {/* Class */}
                 <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
                   <div className="mb-2 flex items-center gap-2 text-blue-600">
@@ -606,8 +689,35 @@ const Students = () => {
 
                   <p className="break-words text-sm font-medium text-gray-800">
                     {selectedStudent.classId?.className ||
-                      selectedStudent.classId?.name ||
                       "Not Assigned"}
+                  </p>
+                </div>
+
+                {/* Section */}
+                <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+                  <div className="mb-2 flex items-center gap-2 text-blue-600">
+                    <Users size={17} />
+                    <span className="text-xs font-semibold text-gray-500">
+                      Section
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-medium text-gray-800">
+                    {selectedStudent.classId?.section || "Not Assigned"}
+                  </p>
+                </div>
+
+                {/* Academic Year */}
+                <div className="min-w-0 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+                  <div className="mb-2 flex items-center gap-2 text-blue-600">
+                    <CalendarDays size={17} />
+                    <span className="text-xs font-semibold text-gray-500">
+                      Academic Year
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-medium text-gray-800">
+                    {selectedStudent.classId?.academicYear || "N/A"}
                   </p>
                 </div>
 
@@ -643,7 +753,7 @@ const Students = () => {
 
             </div>
 
-            {/* Fixed Modal Footer */}
+            {/* Modal Footer */}
             <div className="shrink-0 border-t border-gray-100 bg-white p-3.5 sm:px-6 sm:py-4">
               <button
                 type="button"
