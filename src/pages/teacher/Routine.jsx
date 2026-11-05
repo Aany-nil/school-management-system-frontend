@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState } from "react";
 import api from "../../services/api";
 import {
@@ -11,6 +10,7 @@ import {
   AlertCircle,
   Filter,
   CalendarCheck,
+  Printer,
 } from "lucide-react";
 
 const days = [
@@ -38,18 +38,53 @@ const normalizeDay = (day) => {
 
   const formatted = String(day).trim().toLowerCase();
 
-  return days.find(
-    (item) => item.toLowerCase() === formatted
-  ) || "";
+  return (
+    days.find((item) => item.toLowerCase() === formatted) || ""
+  );
+};
+
+const escapeHTML = (value) => {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
+const formatTimeForPrint = (time) => {
+  if (!time) return "N/A";
+
+  const [hours, minutes] = time.split(":");
+  const hour = Number(hours);
+  const minute = Number(minutes);
+
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return time;
+  }
+
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
 };
 
 const RoutineSystem = () => {
   const [routines, setRoutines] = useState([]);
+  const [schoolInfo, setSchoolInfo] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedDay, setSelectedDay] = useState("All");
 
+  // Fetch teacher's own routines
   const fetchMyRoutine = async () => {
     try {
       setLoading(true);
@@ -71,10 +106,30 @@ const RoutineSystem = () => {
     }
   };
 
+  // Fetch school information for printing
+  const fetchSchoolInfo = async () => {
+    try {
+      const response = await api.get("/settings/school-info");
+
+      const data =
+        response.data?.data?.school ||
+        response.data?.school ||
+        response.data?.data ||
+        response.data;
+
+      setSchoolInfo(data || {});
+    } catch (err) {
+      console.error("School information fetch error:", err);
+      setSchoolInfo({});
+    }
+  };
+
   useEffect(() => {
     fetchMyRoutine();
+    fetchSchoolInfo();
   }, []);
 
+  // Search and day filtering
   const filteredRoutines = useMemo(() => {
     return routines.filter((routine) => {
       const subjectName = routine.subjectId?.subjectName || "";
@@ -142,6 +197,305 @@ const RoutineSystem = () => {
     setSelectedDay("All");
   };
 
+  // Print teacher's own routine
+  const handlePrint = () => {
+    if (!filteredRoutines.length) {
+      setError("No routine available to print.");
+      return;
+    }
+
+    setError("");
+
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=1100,height=750"
+    );
+
+    if (!printWindow) {
+      setError("Please allow pop-ups to print the routine.");
+      return;
+    }
+
+    const schoolName =
+      schoolInfo.schoolName || schoolInfo.name || "My School";
+
+    const schoolAddress =
+      schoolInfo.schoolAddress || schoolInfo.address || "";
+
+    const schoolPhone = schoolInfo.schoolPhone || "";
+    const schoolEmail = schoolInfo.schoolEmail || "";
+    const logo = schoolInfo.logo || schoolInfo.schoolLogo || "";
+
+    const printDate = new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+    const sortedRoutines = [...filteredRoutines].sort((a, b) => {
+      const dayOrder = days.indexOf(normalizeDay(a.day));
+      const otherDayOrder = days.indexOf(normalizeDay(b.day));
+
+      if (dayOrder !== otherDayOrder) {
+        return dayOrder - otherDayOrder;
+      }
+
+      return String(a.startTime || "").localeCompare(
+        String(b.startTime || "")
+      );
+    });
+
+    const rows = sortedRoutines
+      .map((routine, index) => {
+        const className =
+          routine.classId?.className || "Class";
+
+        const section = routine.classId?.section
+          ? ` - Section ${routine.classId.section}`
+          : "";
+
+        const subjectName =
+          routine.subjectId?.subjectName || "Subject not available";
+
+        const subjectCode =
+          routine.subjectId?.subjectCode || "";
+
+        const teacherName =
+          routine.teacherId?.name ||
+          routine.teacherId?.fullName ||
+          routine.teacherId?.email ||
+          "Assigned Teacher";
+
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHTML(className + section)}</td>
+            <td>
+              ${escapeHTML(subjectName)}
+              ${
+                subjectCode
+                  ? `<br /><small>Code: ${escapeHTML(subjectCode)}</small>`
+                  : ""
+              }
+            </td>
+            <td>${escapeHTML(teacherName)}</td>
+            <td>${escapeHTML(normalizeDay(routine.day) || routine.day || "N/A")}</td>
+            <td>${escapeHTML(formatTimeForPrint(routine.startTime))}</td>
+            <td>${escapeHTML(formatTimeForPrint(routine.endTime))}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>My Teaching Routine</title>
+          <meta charset="UTF-8" />
+
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 15mm;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: Arial, sans-serif;
+              color: #1e293b;
+              margin: 0;
+              padding: 10px;
+            }
+
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #bdccec;
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+
+            .logo {
+              width: 65px;
+              height: 65px;
+              object-fit: contain;
+              margin-bottom: 8px;
+            }
+
+            h1 {
+              margin: 5px 0;
+              font-size: 25px;
+            }
+
+            .school-info {
+              font-size: 12px;
+              color: #475569;
+              line-height: 1.7;
+            }
+
+            .report-title {
+              text-align: center;
+              margin: 20px 0;
+            }
+
+            .report-title h2 {
+              font-size: 19px;
+              margin-bottom: 5px;
+            }
+
+            .report-title p {
+              font-size: 12px;
+              color: #64748b;
+            }
+
+            .meta {
+              display: flex;
+              justify-content: space-between;
+              margin: 15px 0;
+              font-size: 12px;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+            }
+
+            th, td {
+              border: 1px solid #202328;
+              padding: 10px 8px;
+              text-align: left;
+              font-size: 11px;
+            }
+
+            th {
+              background: #eff6ff;
+              color: #334155;
+              font-weight: bold;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            td small {
+              color: #64748b;
+              font-size: 10px;
+            }
+
+            tr {
+              page-break-inside: avoid;
+            }
+
+            .summary {
+              margin-top: 15px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+
+            .signature {
+              margin-top: 65px;
+              display: flex;
+              justify-content: flex-end;
+            }
+
+            .signature div {
+              width: 190px;
+              text-align: center;
+              border-top: 1px solid #334155;
+              padding-top: 8px;
+              font-size: 12px;
+            }
+
+            @media print {
+              body {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+
+          <div class="header">
+            ${
+              logo
+                ? `<img class="logo" src="${escapeHTML(logo)}" alt="School Logo" />`
+                : ""
+            }
+
+            <h1>${escapeHTML(schoolName)}</h1>
+
+            <div class="school-info">
+              ${schoolAddress ? escapeHTML(schoolAddress) + "<br />" : ""}
+              ${schoolPhone ? "Phone: " + escapeHTML(schoolPhone) + "<br />" : ""}
+              ${schoolEmail ? "Email: " + escapeHTML(schoolEmail) : ""}
+            </div>
+          </div>
+
+          <div class="report-title">
+            <h2>TEACHER CLASS ROUTINE</h2>
+            <p>Weekly Teaching Schedule</p>
+          </div>
+
+          <div class="meta">
+            <span>Total Scheduled Classes: ${sortedRoutines.length}</span>
+            <span>Print Date: ${escapeHTML(printDate)}</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>SL</th>
+                <th>Class / Section</th>
+                <th>Subject</th>
+                <th>Teacher</th>
+                <th>Day</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+
+          <div class="summary">
+            Total Classes: ${sortedRoutines.length}
+          </div>
+
+          <div class="signature">
+            <div>Authorized Signature</div>
+          </div>
+
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    const images = Array.from(printWindow.document.images);
+
+    const waitForImages = images.map((image) => {
+      if (image.complete) return Promise.resolve();
+
+      return new Promise((resolve) => {
+        image.onload = resolve;
+        image.onerror = resolve;
+      });
+    });
+
+    Promise.all(waitForImages).then(() => {
+      if (!printWindow.closed) {
+        printWindow.focus();
+        printWindow.print();
+      }
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-3 sm:p-5 lg:p-6">
       <div className="mx-auto max-w-7xl space-y-5 sm:space-y-6">
@@ -164,18 +518,30 @@ const RoutineSystem = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={fetchMyRoutine}
-            disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            <RefreshCw
-              size={17}
-              className={loading ? "animate-spin" : ""}
-            />
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+            <button
+              type="button"
+              onClick={fetchMyRoutine}
+              disabled={loading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              <RefreshCw
+                size={17}
+                className={loading ? "animate-spin" : ""}
+              />
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrint}
+              disabled={loading || filteredRoutines.length === 0}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-500 px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              <Printer size={17} />
+              Print Routine
+            </button>
+          </div>
         </div>
 
         {/* Error */}
