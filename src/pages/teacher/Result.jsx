@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
@@ -13,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  Eye,
 } from "lucide-react";
 import api from "../../services/api";
 
@@ -93,6 +95,10 @@ export default function ResultsManagement() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
+  // Marksheet states
+  const [selectedMarksheet, setSelectedMarksheet] = useState(null);
+  const [schoolInfo, setSchoolInfo] = useState({});
+
   // Load teacher's assigned classes, subjects, students and results.
   const loadData = async () => {
     setLoading(true);
@@ -158,6 +164,23 @@ export default function ResultsManagement() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Load school information for marksheet preview.
+  useEffect(() => {
+    const loadSchoolInfo = async () => {
+      try {
+        const response = await api.get("/settings/setting");
+
+        setSchoolInfo(
+          response.data?.data?.school || {}
+        );
+      } catch (err) {
+        console.log("School information could not be loaded.");
+      }
+    };
+
+    loadSchoolInfo();
   }, []);
 
   // Reset pagination when filters change.
@@ -286,6 +309,49 @@ export default function ResultsManagement() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Open marksheet for selected student and exam.
+  const openMarksheet = (studentId, examName) => {
+    const studentResults = results
+      .filter(
+        (result) =>
+          getId(result.studentId) === studentId &&
+          result.examName === examName
+      )
+      .sort((a, b) =>
+        getName(a.subjectId).localeCompare(getName(b.subjectId))
+      );
+
+    if (studentResults.length === 0) {
+      setError("No marksheet data found.");
+      return;
+    }
+
+    const firstResult = studentResults[0];
+
+    const obtainedMarks = studentResults.reduce(
+      (sum, item) => sum + Number(item.marks || 0),
+      0
+    );
+
+    const totalMarks = studentResults.reduce(
+      (sum, item) => sum + Number(item.totalMarks || 0),
+      0
+    );
+
+    setSelectedMarksheet({
+      student: firstResult.studentId,
+      class: firstResult.classId,
+      examName,
+      results: studentResults,
+      obtainedMarks,
+      totalMarks,
+      percentage:
+        totalMarks > 0
+          ? ((obtainedMarks / totalMarks) * 100).toFixed(2)
+          : "0.00",
+    });
   };
 
   // Filter results.
@@ -644,7 +710,7 @@ export default function ResultsManagement() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] text-left text-sm">
+                <table className="w-full min-w-[950px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                     <tr>
                       <th className="whitespace-nowrap px-5 py-4">
@@ -673,6 +739,10 @@ export default function ResultsManagement() {
 
                       <th className="whitespace-nowrap px-5 py-4">
                         Grade
+                      </th>
+
+                      <th className="whitespace-nowrap px-5 py-4">
+                        Marksheet
                       </th>
                     </tr>
                   </thead>
@@ -735,6 +805,22 @@ export default function ResultsManagement() {
                             <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
                               {result.grade || "Not assigned"}
                             </span>
+                          </td>
+
+                          <td className="whitespace-nowrap px-5 py-4">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openMarksheet(
+                                  getId(result.studentId),
+                                  result.examName
+                                )
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                            >
+                              <Eye size={15} />
+                              View
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1098,6 +1184,256 @@ export default function ResultsManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Marksheet View Modal */}
+      {selectedMarksheet && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-5">
+          <div className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                  <FileText size={21} />
+                </div>
+
+                <div>
+                  <h2 className="font-bold text-slate-800">
+                    Student Marksheet
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    View-only examination marksheet
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMarksheet(null)}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            {/* Marksheet Content */}
+            <div className="overflow-y-auto p-4 sm:p-7">
+              <div className="mx-auto max-w-3xl border border-slate-200 p-5 sm:p-8">
+
+                {/* School Information */}
+                <div className="border-b-2 border-blue-600 pb-5 text-center">
+                  {schoolInfo.schoolLogo && (
+                    <img
+                      src={schoolInfo.schoolLogo}
+                      alt="School Logo"
+                      className="mx-auto mb-3 h-16 w-16 rounded-lg object-contain"
+                    />
+                  )}
+
+                  <h1 className="text-xl font-bold uppercase text-slate-800 sm:text-2xl">
+                    {schoolInfo.schoolName || "School Management System"}
+                  </h1>
+
+                  {schoolInfo.schoolAddress && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {schoolInfo.schoolAddress}
+                    </p>
+                  )}
+
+                  <div className="mt-1 flex flex-wrap justify-center gap-x-4 text-xs text-slate-500">
+                    {schoolInfo.schoolEmail && (
+                      <span>{schoolInfo.schoolEmail}</span>
+                    )}
+
+                    {schoolInfo.schoolPhone && (
+                      <span>{schoolInfo.schoolPhone}</span>
+                    )}
+                  </div>
+
+                  <h2 className="mt-4 inline-block rounded-full bg-blue-50 px-5 py-2 text-sm font-bold uppercase tracking-wider text-blue-700">
+                    Academic Marksheet
+                  </h2>
+                </div>
+
+                {/* Student Information */}
+                <div className="mt-6 grid grid-cols-1 gap-4 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-slate-500">Student Name</p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {getName(selectedMarksheet.student)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">Student Email</p>
+                    <p className="mt-1 break-all font-medium text-slate-700">
+                      {selectedMarksheet.student?.email || "N/A"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">Class</p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {getClassName(selectedMarksheet.class)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-slate-500">Examination</p>
+                    <p className="mt-1 font-semibold text-slate-800">
+                      {selectedMarksheet.examName}
+                    </p>
+                  </div>
+
+                  {schoolInfo.academicYear && (
+                    <div>
+                      <p className="text-xs text-slate-500">Academic Year</p>
+                      <p className="mt-1 font-medium text-slate-700">
+                        {schoolInfo.academicYear}
+                      </p>
+                    </div>
+                  )}
+
+                  {schoolInfo.currentSession && (
+                    <div>
+                      <p className="text-xs text-slate-500">Session</p>
+                      <p className="mt-1 font-medium text-slate-700">
+                        {schoolInfo.currentSession}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Subject Marks */}
+                <div className="mt-7">
+                  <h3 className="mb-3 font-bold text-slate-800">
+                    Subject-wise Academic Performance
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[500px] border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-blue-600 text-white">
+                          <th className="border border-blue-500 px-3 py-3 text-left">
+                            Subject
+                          </th>
+                          <th className="border border-blue-500 px-3 py-3 text-center">
+                            Total Marks
+                          </th>
+                          <th className="border border-blue-500 px-3 py-3 text-center">
+                            Obtained Marks
+                          </th>
+                          <th className="border border-blue-500 px-3 py-3 text-center">
+                            Percentage
+                          </th>
+                          <th className="border border-blue-500 px-3 py-3 text-center">
+                            Grade
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {selectedMarksheet.results.map((item, index) => (
+                          <tr
+                            key={item._id}
+                            className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                          >
+                            <td className="border border-slate-200 px-3 py-3 font-medium text-slate-700">
+                              {getName(item.subjectId)}
+                            </td>
+
+                            <td className="border border-slate-200 px-3 py-3 text-center">
+                              {item.totalMarks}
+                            </td>
+
+                            <td className="border border-slate-200 px-3 py-3 text-center font-semibold">
+                              {item.marks}
+                            </td>
+
+                            <td className="border border-slate-200 px-3 py-3 text-center">
+                              {formatPercentage(item.marks, item.totalMarks)}%
+                            </td>
+
+                            <td className="border border-slate-200 px-3 py-3 text-center font-semibold text-blue-700">
+                              {item.grade || "N/A"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+
+                      <tfoot>
+                        <tr className="bg-blue-50 font-bold text-slate-800">
+                          <td className="border border-slate-200 px-3 py-3">
+                            Total
+                          </td>
+
+                          <td className="border border-slate-200 px-3 py-3 text-center">
+                            {selectedMarksheet.totalMarks}
+                          </td>
+
+                          <td className="border border-slate-200 px-3 py-3 text-center">
+                            {selectedMarksheet.obtainedMarks}
+                          </td>
+
+                          <td className="border border-slate-200 px-3 py-3 text-center">
+                            {selectedMarksheet.percentage}%
+                          </td>
+
+                          <td className="border border-slate-200 px-3 py-3 text-center">
+                            —
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Overall Result */}
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-xs text-slate-500">Total Subjects</p>
+                    <p className="mt-1 text-xl font-bold text-slate-800">
+                      {selectedMarksheet.results.length}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 p-4">
+                    <p className="text-xs text-slate-500">Obtained Marks</p>
+                    <p className="mt-1 text-xl font-bold text-slate-800">
+                      {selectedMarksheet.obtainedMarks}
+                    </p>
+                  </div>
+
+                  <div className="col-span-2 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:col-span-1">
+                    <p className="text-xs text-blue-600">Overall Percentage</p>
+                    <p className="mt-1 text-xl font-bold text-blue-700">
+                      {selectedMarksheet.percentage}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Note */}
+                <div className="mt-8 border-t border-slate-200 pt-4 text-center">
+                  <p className="text-xs text-slate-500">
+                    This marksheet is provided for academic viewing purposes.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setSelectedMarksheet(null)}
+                className="rounded-lg bg-slate-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
