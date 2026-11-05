@@ -52,6 +52,20 @@ const getStatus = (salary) => {
   return "Due";
 };
 
+const escapeHTML = (value) => {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+
+    return entities[character];
+  });
+};
+
 function SummaryCard({ title, amount, icon, color }) {
   const colors = {
     blue: "bg-blue-50 text-blue-600",
@@ -106,6 +120,10 @@ export default function Salary() {
   const [teachers, setTeachers] = useState([]);
   const [search, setSearch] = useState("");
 
+  // Salary report states
+  const [reportMonth, setReportMonth] = useState(getCurrentMonth());
+  const [schoolInfo, setSchoolInfo] = useState({});
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
@@ -149,6 +167,7 @@ export default function Salary() {
   const hasOpenModal =
     showCreateModal || !!paymentSalary || !!payslip;
 
+  // Load salary records
   const loadSalaries = async (showLoader = true) => {
     if (showLoader) setLoading(true);
     setError("");
@@ -179,6 +198,7 @@ export default function Salary() {
     }
   };
 
+  // Load teachers
   const loadTeachers = async () => {
     if (!isAdmin) return;
 
@@ -208,8 +228,27 @@ export default function Salary() {
     }
   };
 
+  // Load school information
+  const loadSchoolInfo = async () => {
+    try {
+      const response = await api.get("/settings/school-info");
+
+      const data =
+        response.data?.data?.school ||
+        response.data?.school ||
+        response.data?.data ||
+        response.data;
+
+      setSchoolInfo(data || {});
+    } catch (err) {
+      console.log("School information could not be loaded.");
+      setSchoolInfo({});
+    }
+  };
+
   const refreshData = async () => {
     setError("");
+
     await Promise.all([
       loadSalaries(),
       isAdmin ? loadTeachers() : Promise.resolve(),
@@ -218,6 +257,10 @@ export default function Salary() {
 
   useEffect(() => {
     refreshData();
+
+    if (isAdmin) {
+      loadSchoolInfo();
+    }
   }, []);
 
   const handleFormChange = (e) => {
@@ -252,6 +295,7 @@ export default function Salary() {
     setError("");
   };
 
+  // Create salary
   const handleCreateSalary = async (e) => {
     e.preventDefault();
     setError("");
@@ -298,6 +342,7 @@ export default function Salary() {
     }
   };
 
+  // Record payment
   const handlePayment = async (e) => {
     e.preventDefault();
 
@@ -350,6 +395,7 @@ export default function Salary() {
     }
   };
 
+  // Delete salary
   const handleDelete = async (id) => {
     if (
       !window.confirm(
@@ -382,6 +428,7 @@ export default function Salary() {
     }
   };
 
+  // View payslip
   const handleViewPayslip = async (id) => {
     setError("");
     setSuccess("");
@@ -400,6 +447,348 @@ export default function Salary() {
     }
   };
 
+  // Print monthly salary report - Admin only
+  const handlePrintSalaryReport = () => {
+    if (!isAdmin) {
+      setError("Only admin can print the salary report.");
+      return;
+    }
+
+    // Match YYYY-MM and date-like month values
+    const reportSalaries = salaries.filter((salary) => {
+      const salaryMonth = String(salary.month || "").slice(0, 7);
+      return salaryMonth === reportMonth;
+    });
+
+    if (reportSalaries.length === 0) {
+      setError("No salary records found for the selected month.");
+      return;
+    }
+
+    const [year, month] = reportMonth.split("-");
+
+    const monthName = new Date(
+      Number(year),
+      Number(month) - 1
+    ).toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+
+    const schoolName =
+      schoolInfo.schoolName || schoolInfo.name || "My School";
+
+    const schoolAddress =
+      schoolInfo.schoolAddress || schoolInfo.address || "";
+
+    const schoolPhone =
+      schoolInfo.schoolPhone || schoolInfo.phone || "";
+
+    const schoolEmail =
+      schoolInfo.schoolEmail || schoolInfo.email || "";
+
+    const schoolLogo =
+      schoolInfo.logo || schoolInfo.schoolLogo || "";
+
+    const tableRows = reportSalaries
+      .map((salary, index) => {
+        const teacher = salary.teacher || {};
+        const status = getStatus(salary);
+
+        const paymentDate = salary.paymentDate
+          ? new Date(salary.paymentDate).toLocaleDateString("en-GB")
+          : "N/A";
+
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>
+              <strong>${escapeHTML(teacher.name || "Teacher")}</strong>
+            </td>
+            <td>${escapeHTML(teacher.email || "N/A")}</td>
+            <td>${formatMoney(salary.salaryAmount)}</td>
+            <td>${formatMoney(salary.paidAmount)}</td>
+            <td>${formatMoney(getDueAmount(salary))}</td>
+            <td>${escapeHTML(status)}</td>
+            <td>${escapeHTML(paymentDate)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      setError(
+        "Please allow pop-ups in your browser to print the report."
+      );
+      return;
+    }
+
+    const logoHTML = schoolLogo
+      ? `<img src="${escapeHTML(schoolLogo)}" alt="School Logo" class="school-logo" />`
+      : "";
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Teacher Salary Report - ${escapeHTML(monthName)}</title>
+          <meta charset="UTF-8" />
+
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 15mm;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              margin: 0;
+              padding: 0;
+              background: #fff;
+              color: #111;
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 12px;
+            }
+
+            .school-header {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 15px;
+              padding-bottom: 15px;
+              border-bottom: 2px solid #222;
+              text-align: center;
+            }
+
+            .school-logo {
+              width: 65px;
+              height: 65px;
+              object-fit: contain;
+              filter: grayscale(100%);
+            }
+
+            .school-details h1 {
+              margin: 0 0 6px;
+              font-size: 23px;
+              font-weight: 700;
+              color: #111;
+            }
+
+            .school-details p {
+              margin: 3px 0;
+              font-size: 11px;
+              color: #333;
+            }
+
+            .report-heading {
+              margin: 22px 0 20px;
+              text-align: center;
+            }
+
+            .report-heading h2 {
+              margin: 0 0 7px;
+              font-size: 19px;
+              font-weight: 700;
+              letter-spacing: 1px;
+              text-transform: uppercase;
+            }
+
+            .report-heading p {
+              margin: 0;
+              font-size: 12px;
+              color: #444;
+            }
+
+            .report-info {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 12px;
+              font-size: 11px;
+              color: #333;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              table-layout: auto;
+            }
+
+            thead {
+              border-top: 1.5px solid #222;
+              border-bottom: 1.5px solid #222;
+            }
+
+            th {
+              padding: 11px 9px;
+              text-align: left;
+              font-size: 10.5px;
+              font-weight: 700;
+              color: #111;
+              background: #fff;
+              white-space: nowrap;
+            }
+
+            td {
+              padding: 12px 9px;
+              text-align: left;
+              font-size: 10.5px;
+              color: #222;
+              border-bottom: 1px solid #d6d6d6;
+              vertical-align: middle;
+            }
+
+            tbody tr:last-child {
+              border-bottom: 1.5px solid #222;
+            }
+
+            td strong {
+              font-weight: 600;
+            }
+
+            .report-footer {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              margin-top: 55px;
+              font-size: 11px;
+              color: #333;
+            }
+
+            .signature {
+              width: 190px;
+              text-align: center;
+            }
+
+            .signature-line {
+              padding-top: 8px;
+              border-top: 1px solid #222;
+            }
+
+            @media print {
+              body {
+                background: #fff !important;
+                color: #000 !important;
+              }
+
+              thead {
+                display: table-header-group;
+              }
+
+              tr {
+                page-break-inside: avoid;
+              }
+
+              * {
+                -webkit-print-color-adjust: economy !important;
+                print-color-adjust: economy !important;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+          <header class="school-header">
+            ${logoHTML}
+
+            <div class="school-details">
+              <h1>${escapeHTML(schoolName)}</h1>
+
+              ${schoolAddress
+                ? `<p>${escapeHTML(schoolAddress)}</p>`
+                : ""}
+
+              ${schoolPhone
+                ? `<p>Phone: ${escapeHTML(schoolPhone)}</p>`
+                : ""}
+
+              ${schoolEmail
+                ? `<p>Email: ${escapeHTML(schoolEmail)}</p>`
+                : ""}
+            </div>
+          </header>
+
+          <section class="report-heading">
+            <h2>Teacher Salary Report</h2>
+            <p>${escapeHTML(monthName)}</p>
+          </section>
+
+          <div class="report-info">
+            <span>Salary Records: ${reportSalaries.length}</span>
+            <span>Report Month: ${escapeHTML(reportMonth)}</span>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>SL</th>
+                <th>Teacher Name</th>
+                <th>Email</th>
+                <th>Total Salary</th>
+                <th>Paid Amount</th>
+                <th>Due Amount</th>
+                <th>Status</th>
+                <th>Payment Date</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+
+          <footer class="report-footer">
+            <div>
+              Printed on:
+              ${escapeHTML(new Date().toLocaleDateString("en-GB"))}
+            </div>
+
+            <div class="signature">
+              <div class="signature-line">
+                Authorized Signature
+              </div>
+            </div>
+          </footer>
+
+          <script>
+            window.onload = function () {
+              const images = Array.from(document.images);
+
+              Promise.all(
+                images.map((image) => {
+                  if (image.complete) {
+                    return Promise.resolve();
+                  }
+
+                  return new Promise((resolve) => {
+                    image.onload = resolve;
+                    image.onerror = resolve;
+                  });
+                })
+              ).then(() => {
+                setTimeout(() => {
+                  window.print();
+                }, 300);
+              });
+            };
+
+            window.onafterprint = function () {
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    setError("");
+  };
+
+  // Search filter
   const filteredSalaries = salaries.filter((salary) => {
     const teacher = salary.teacher || {};
 
@@ -435,7 +824,7 @@ export default function Salary() {
 
   return (
     <div className="min-h-screen min-w-0 w-full space-y-5 bg-gray-50 p-3 sm:space-y-6 sm:p-5 lg:p-8">
-      {/* Print styles */}
+      {/* Payslip Print Styles */}
       <style>
         {`
           @media print {
@@ -523,7 +912,7 @@ export default function Salary() {
         </div>
       )}
 
-      {/* Summary Cards */}
+      {/* Summary Cards - Dashboard UI */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
         <SummaryCard
           title="Total Salary"
@@ -562,19 +951,43 @@ export default function Salary() {
             </p>
           </div>
 
-          <div className="relative w-full sm:max-w-sm">
-            <Search
-              size={19}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            {isAdmin && (
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <input
+                  type="month"
+                  value={reportMonth}
+                  onChange={(e) => setReportMonth(e.target.value)}
+                  aria-label="Select salary report month"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500 sm:w-auto"
+                />
 
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search teacher, month or status..."
-              className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
+                <button
+                  type="button"
+                  onClick={handlePrintSalaryReport}
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-gray-500 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+                >
+                  <Printer size={16} />
+                  Print Report
+                </button>
+              </div>
+            )}
+
+            <div className="relative w-full sm:max-w-sm">
+              <Search
+                size={19}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search teacher, month or status..."
+                className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
           </div>
         </div>
 
