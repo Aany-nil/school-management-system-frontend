@@ -17,9 +17,19 @@ import api from "../../services/api";
 
 const initialForm = {
   student: "",
+  feeType: "Tuition Fee",
   totalFee: "",
   paidAmount: "0",
+  paymentMethod: "Cash",
 };
+
+const paymentMethods = [
+  "Cash",
+  "Bank Transfer",
+  "Mobile Banking",
+  "Card",
+  "Other",
+];
 
 const getDueAmount = (totalFee, paidAmount) =>
   Math.max(0, Number(totalFee || 0) - Number(paidAmount || 0));
@@ -127,7 +137,7 @@ export default function Fees() {
 
   const isAdmin = role === "admin";
 
-  // Load school information for receipt
+  // Load school information
   const loadSchoolInfo = async () => {
     try {
       const response = await api.get("/settings/school-info");
@@ -135,6 +145,7 @@ export default function Fees() {
       const school =
         response.data?.data?.school ||
         response.data?.school ||
+        response.data?.data ||
         {};
 
       setSchoolInfo(school);
@@ -145,6 +156,7 @@ export default function Fees() {
     }
   };
 
+  // Load fee records
   const loadFees = async () => {
     setLoading(true);
     setError("");
@@ -176,7 +188,8 @@ export default function Fees() {
               (student) => student.role === "student"
             )
           );
-        } catch {
+        } catch (studentError) {
+          console.error("Student list load failed:", studentError);
           setStudents([]);
         }
       } else {
@@ -195,7 +208,7 @@ export default function Fees() {
       setFees([]);
       setError(
         err.response?.data?.message ||
-          "Fee records load, API ও login token check"
+          "Fee records could not load. Please check API and login token."
       );
     } finally {
       setLoading(false);
@@ -217,8 +230,11 @@ export default function Fees() {
       return;
     }
 
-    // Open window immediately to avoid browser popup blocking
-    const printWindow = window.open("", "_blank", "width=900,height=700");
+    const printWindow = window.open(
+      "",
+      "_blank",
+      "width=900,height=700"
+    );
 
     if (!printWindow) {
       setError("Please allow pop-ups to print the receipt.");
@@ -236,6 +252,10 @@ export default function Fees() {
       }
 
       const student = fee.student || {};
+      const studentClass =
+        student.classId && typeof student.classId === "object"
+          ? student.classId
+          : {};
 
       const totalFee = Number(fee.totalFee || 0);
       const paidAmount = Number(fee.paidAmount || 0);
@@ -249,21 +269,33 @@ export default function Fees() {
 
       const studentName = student.name || "Student";
       const studentEmail = student.email || "Not available";
-      const studentId = student._id || student.id || "Not available";
+
+      const studentId = student._id
+        ? `STU-${String(student._id).slice(-8).toUpperCase()}`
+        : "Not available";
 
       const className =
-        student.classId?.name ||
-        student.class?.name ||
+        studentClass.className ||
         student.className ||
-        "Not available";
+        "Not Assigned";
+
+      const section =
+        studentClass.section ||
+        student.section ||
+        "Not Assigned";
+
+      const academicYear =
+        studentClass.academicYear ||
+        student.academicYear ||
+        "Not Available";
 
       const rollNumber =
         student.rollNumber ||
-        student.roll ||
-        "Not available";
+        "Not Assigned";
 
+      // Fee createdAt is used as the payment/record date.
       const paymentDate = formatDate(
-        fee.paymentDate || fee.updatedAt || fee.createdAt
+        fee.createdAt || fee.paymentDate
       );
 
       const receiptNumber = fee._id
@@ -274,9 +306,42 @@ export default function Fees() {
         school.schoolName || "My School"
       );
 
-      const logo = school.schoolLogo
-        ? `<img src="${escapeHTML(school.schoolLogo)}" class="school-logo" alt="School Logo" />`
+      const schoolAddress = escapeHTML(
+        school.schoolAddress || ""
+      );
+
+      const schoolEmail = escapeHTML(
+        school.schoolEmail || ""
+      );
+
+      const schoolPhone = escapeHTML(
+        school.schoolPhone || ""
+      );
+
+      const logoUrl =
+        school.schoolLogo ||
+        school.logo ||
+        school.schoolLogoUrl ||
+        "";
+
+      const logo = logoUrl
+        ? `<img src="${escapeHTML(logoUrl)}" class="school-logo" alt="School Logo" />`
         : "";
+
+      const feeType = escapeHTML(
+        fee.feeType || "Tuition Fee"
+      );
+
+      const paymentMethod = escapeHTML(
+        fee.paymentMethod || "Cash"
+      );
+
+      const statusClass =
+        status === "Paid"
+          ? "paid"
+          : status === "Partial"
+            ? "partial"
+            : "due";
 
       printWindow.document.open();
 
@@ -285,7 +350,6 @@ export default function Fees() {
         <html>
         <head>
           <title>Fee Receipt - ${escapeHTML(receiptNumber)}</title>
-
           <meta charset="UTF-8" />
 
           <style>
@@ -348,6 +412,7 @@ export default function Fees() {
             .receipt-number {
               text-align: right;
               font-size: 12px;
+              line-height: 1.8;
               margin-bottom: 20px;
             }
 
@@ -368,6 +433,7 @@ export default function Fees() {
 
             .detail-item {
               font-size: 13px;
+              overflow-wrap: anywhere;
             }
 
             .detail-item span {
@@ -425,18 +491,17 @@ export default function Fees() {
             .payment-info {
               margin-top: 20px;
               font-size: 13px;
-              line-height: 1.8;
+              line-height: 2;
             }
 
             .signature-area {
               display: flex;
-              justify-content: space-between;
-              gap: 30px;
-              margin-top: 85px;
+              justify-content: flex-end;
+              margin-top: 90px;
             }
 
             .signature {
-              width: 200px;
+              width: 220px;
               border-top: 1px solid #374151;
               text-align: center;
               padding-top: 8px;
@@ -450,6 +515,7 @@ export default function Fees() {
               padding-top: 15px;
               color: #6b7280;
               font-size: 11px;
+              line-height: 1.8;
             }
 
             .print-button {
@@ -508,10 +574,11 @@ export default function Fees() {
 
               <h1>${schoolName}</h1>
 
-              <p>${escapeHTML(school.schoolAddress || "")}</p>
+              <p>${schoolAddress}</p>
+
               <p>
-                ${school.schoolEmail ? `Email: ${escapeHTML(school.schoolEmail)}` : ""}
-                ${school.schoolPhone ? ` | Phone: ${escapeHTML(school.schoolPhone)}` : ""}
+                ${schoolEmail ? `Email: ${schoolEmail}` : ""}
+                ${schoolPhone ? ` | Phone: ${schoolPhone}` : ""}
               </p>
             </div>
 
@@ -520,14 +587,20 @@ export default function Fees() {
             </div>
 
             <div class="receipt-number">
-              <strong>Receipt No:</strong> ${escapeHTML(receiptNumber)}
+              <strong>Receipt No:</strong>
+              ${escapeHTML(receiptNumber)}
               <br />
-              <strong>Payment Date:</strong> ${escapeHTML(paymentDate)}
+
+              <strong>Payment Date:</strong>
+              ${escapeHTML(paymentDate)}
             </div>
 
-            <div class="section-title">STUDENT INFORMATION</div>
+            <div class="section-title">
+              STUDENT INFORMATION
+            </div>
 
             <div class="details">
+
               <div class="detail-item">
                 <span>Student Name</span>
                 <strong>${escapeHTML(studentName)}</strong>
@@ -544,17 +617,30 @@ export default function Fees() {
               </div>
 
               <div class="detail-item">
+                <span>Roll Number</span>
+                <strong>${escapeHTML(rollNumber)}</strong>
+              </div>
+
+              <div class="detail-item">
                 <span>Class</span>
                 <strong>${escapeHTML(className)}</strong>
               </div>
 
               <div class="detail-item">
-                <span>Roll Number</span>
-                <strong>${escapeHTML(rollNumber)}</strong>
+                <span>Section</span>
+                <strong>${escapeHTML(section)}</strong>
               </div>
+
+              <div class="detail-item">
+                <span>Academic Year</span>
+                <strong>${escapeHTML(academicYear)}</strong>
+              </div>
+
             </div>
 
-            <div class="section-title">FEE PAYMENT DETAILS</div>
+            <div class="section-title">
+              FEE PAYMENT DETAILS
+            </div>
 
             <table>
               <thead>
@@ -566,8 +652,8 @@ export default function Fees() {
 
               <tbody>
                 <tr>
-                  <td>Fee Type</td>
-                  <td class="amount">${escapeHTML(fee.feeType || "Not specified")}</td>
+                  <td>${feeType}</td>
+                  <td class="amount">${escapeHTML(formatMoney(totalFee))}</td>
                 </tr>
 
                 <tr>
@@ -589,24 +675,20 @@ export default function Fees() {
 
             <div class="payment-info">
               <strong>Payment Method:</strong>
-              ${escapeHTML(fee.paymentMethod || "Not recorded")}
+              ${paymentMethod}
               <br />
 
               <strong>Payment Status:</strong>
-              <span class="status ${
-                status === "Paid"
-                  ? "paid"
-                  : status === "Partial"
-                    ? "partial"
-                    : "due"
-              }">
+
+              <span class="status ${statusClass}">
                 ${escapeHTML(status)}
               </span>
             </div>
 
             <div class="signature-area">
-              <div class="signature">Student / Guardian Signature</div>
-              <div class="signature">Authorized Signature</div>
+              <div class="signature">
+                Authorized Signature
+              </div>
             </div>
 
             <div class="footer">
@@ -614,6 +696,7 @@ export default function Fees() {
               <br />
               Thank you.
             </div>
+
           </div>
 
           <button class="print-button" onclick="window.print()">
@@ -638,6 +721,7 @@ export default function Fees() {
               });
             };
           </script>
+
         </body>
         </html>
       `);
@@ -679,6 +763,7 @@ export default function Fees() {
     setError("");
   };
 
+  // Create Fee
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -710,13 +795,20 @@ export default function Fees() {
       return;
     }
 
+    if (!form.feeType.trim()) {
+      setError("Please enter a fee type.");
+      return;
+    }
+
     setSaving(true);
 
     try {
       const response = await api.post("/fee/create", {
         student: form.student,
+        feeType: form.feeType.trim(),
         totalFee,
         paidAmount,
+        paymentMethod: form.paymentMethod,
       });
 
       setSuccess(
@@ -737,6 +829,7 @@ export default function Fees() {
     }
   };
 
+  // Delete Fee
   const handleDelete = async (feeId) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this fee record?"
@@ -768,13 +861,22 @@ export default function Fees() {
     }
   };
 
+  // Search
   const filteredFees = fees.filter((fee) => {
     const student = fee.student || {};
+    const studentClass =
+      student.classId && typeof student.classId === "object"
+        ? student.classId
+        : {};
 
     const searchableText = [
       student.name,
       student.email,
-      student.role,
+      student.rollNumber,
+      studentClass.className,
+      studentClass.section,
+      fee.feeType,
+      fee.paymentMethod,
       fee.status,
     ]
       .filter(Boolean)
@@ -784,6 +886,7 @@ export default function Fees() {
     return searchableText.includes(search.toLowerCase());
   });
 
+  // Summary
   const totalExpected = filteredFees.reduce(
     (sum, fee) => sum + Number(fee.totalFee || 0),
     0
@@ -818,6 +921,7 @@ export default function Fees() {
 
   return (
     <div className="min-h-screen min-w-0 w-full space-y-5 bg-gray-50 p-3 sm:space-y-6 sm:p-5 lg:p-8">
+
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div className="min-w-0">
@@ -848,7 +952,7 @@ export default function Fees() {
             <button
               type="button"
               onClick={openCreateForm}
-              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 sm:px-4"
+              className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 sm:px-4"
             >
               <Plus size={18} />
               Add Fee
@@ -903,7 +1007,7 @@ export default function Fees() {
         </div>
       </div>
 
-      {/* Table Section */}
+      {/* Fee Records */}
       <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5">
         <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div>
@@ -926,7 +1030,7 @@ export default function Fees() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search student or status..."
+              placeholder="Search student, roll or status..."
               className="w-full rounded-lg border border-gray-200 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
@@ -1035,9 +1139,7 @@ export default function Fees() {
 
                       <td className="px-4 py-4">
                         <span
-                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                            status
-                          )}`}
+                          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(status)}`}
                         >
                           {status === "Paid" ? (
                             <CheckCircle size={14} />
@@ -1103,6 +1205,7 @@ export default function Fees() {
       {showForm && isAdmin && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-3 sm:p-5">
           <div className="my-auto flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 p-4 sm:p-5">
               <div className="min-w-0">
                 <h2 className="text-lg font-bold text-gray-800 sm:text-xl">
@@ -1130,6 +1233,7 @@ export default function Fees() {
               className="flex min-h-0 flex-1 flex-col"
             >
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+
                 {error && (
                   <div
                     role="alert"
@@ -1139,6 +1243,7 @@ export default function Fees() {
                   </div>
                 )}
 
+                {/* Student */}
                 <div>
                   <label
                     htmlFor="student"
@@ -1172,6 +1277,34 @@ export default function Fees() {
                   )}
                 </div>
 
+                {/* Fee Type */}
+                <div>
+                  <label
+                    htmlFor="feeType"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Fee Type *
+                  </label>
+
+                  <select
+                    id="feeType"
+                    name="feeType"
+                    value={form.feeType}
+                    onChange={handleChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="Tuition Fee">Tuition Fee</option>
+                    <option value="Admission Fee">Admission Fee</option>
+                    <option value="Exam Fee">Exam Fee</option>
+                    <option value="Monthly Fee">Monthly Fee</option>
+                    <option value="Library Fee">Library Fee</option>
+                    <option value="Transport Fee">Transport Fee</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {/* Total Fee */}
                 <div>
                   <label
                     htmlFor="totalFee"
@@ -1194,6 +1327,7 @@ export default function Fees() {
                   />
                 </div>
 
+                {/* Paid Amount */}
                 <div>
                   <label
                     htmlFor="paidAmount"
@@ -1216,9 +1350,37 @@ export default function Fees() {
                   />
                 </div>
 
+                {/* Payment Method */}
+                <div>
+                  <label
+                    htmlFor="paymentMethod"
+                    className="mb-1.5 block text-sm font-medium text-gray-700"
+                  >
+                    Payment Method *
+                  </label>
+
+                  <select
+                    id="paymentMethod"
+                    name="paymentMethod"
+                    value={form.paymentMethod}
+                    onChange={handleChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    {paymentMethods.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Preview */}
                 <div className="space-y-3 rounded-lg bg-gray-50 p-4">
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-gray-600">Due Amount</span>
+                    <span className="text-gray-600">
+                      Due Amount
+                    </span>
 
                     <span className="font-bold text-red-600">
                       {formatMoney(
@@ -1252,6 +1414,7 @@ export default function Fees() {
                 </div>
               </div>
 
+              {/* Modal Footer */}
               <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-white p-4 sm:flex-row sm:justify-end sm:p-5">
                 <button
                   type="button"

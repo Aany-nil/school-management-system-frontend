@@ -14,6 +14,10 @@ import {
   XCircle,
   AlertCircle,
   LoaderCircle,
+  Hash,
+  School,
+  Layers,
+  CalendarDays,
 } from "lucide-react";
 
 import api from "../../services/api";
@@ -95,8 +99,34 @@ export default function StudentDashboard() {
     }
   })();
 
+  const studentProfile = dashboard?.profile || {};
+
   const studentName =
-    dashboard?.profile?.name || user?.name || "Student";
+    studentProfile.name || user?.name || "Student";
+
+  // Student Academic Information
+  const studentClass =
+    studentProfile.classId || studentProfile.class || {};
+
+  const rollNumber =
+    studentProfile.rollNumber ||
+    user?.rollNumber ||
+    "Not Assigned";
+
+  const className =
+    studentClass.className ||
+    studentProfile.className ||
+    "Not Assigned";
+
+  const section =
+    studentClass.section ||
+    studentProfile.section ||
+    "Not Assigned";
+
+  const academicYear =
+    studentClass.academicYear ||
+    studentProfile.academicYear ||
+    "Not Assigned";
 
   if (loading) {
     return (
@@ -106,6 +136,7 @@ export default function StudentDashboard() {
             className="mx-auto animate-spin text-blue-600"
             size={36}
           />
+
           <p className="mt-3 text-sm text-slate-500">
             Loading your dashboard...
           </p>
@@ -248,6 +279,72 @@ export default function StudentDashboard() {
         </div>
       </section>
 
+      {/* Student Information */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="mb-5 flex items-center gap-3">
+          <div className="rounded-xl bg-blue-100 p-3 text-blue-700">
+            <GraduationCap size={24} />
+          </div>
+
+          <div>
+            <h2 className="font-bold text-slate-900">
+              My Information
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+              Your personal academic details
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-blue-600">
+              <p className="text-xs font-medium">Roll Number</p>
+            </div>
+
+            <p className="mt-3 break-words text-lg font-bold text-blue-700 sm:text-xl">
+              {rollNumber}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-violet-600">
+              <School size={17} />
+              <p className="text-xs font-medium">Class</p>
+            </div>
+
+            <p className="mt-3 break-words text-lg font-bold text-violet-700 sm:text-xl">
+              {className}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-green-100 bg-green-50 p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-green-600">
+              <Layers size={17} />
+              <p className="text-xs font-medium">Section</p>
+            </div>
+
+            <p className="mt-3 break-words text-lg font-bold text-green-700 sm:text-xl">
+              {section}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 sm:p-4">
+            <div className="flex items-center gap-2 text-amber-600">
+              <CalendarDays size={17} />
+              <p className="text-xs font-medium">Academic Year</p>
+            </div>
+
+            <p className="mt-3 break-words text-lg font-bold text-amber-700 sm:text-xl">
+              {academicYear}
+            </p>
+          </div>
+
+        </div>
+      </section>
+
       {/* Statistics */}
       <section className="w-full min-w-0">
         <div className="mb-4">
@@ -321,10 +418,7 @@ export default function StudentDashboard() {
 
           <div className="mt-5 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3">
             <div className="rounded-xl bg-green-50 p-2 text-center sm:p-3">
-              <CheckCircle2
-                className="mx-auto text-green-600"
-                size={20}
-              />
+              <CheckCircle2 className="mx-auto text-green-600" size={20} />
 
               <p className="mt-2 text-lg font-bold text-green-700 sm:text-xl">
                 {present}
@@ -336,10 +430,7 @@ export default function StudentDashboard() {
             </div>
 
             <div className="rounded-xl bg-red-50 p-2 text-center sm:p-3">
-              <XCircle
-                className="mx-auto text-red-600"
-                size={20}
-              />
+              <XCircle className="mx-auto text-red-600" size={20} />
 
               <p className="mt-2 text-lg font-bold text-red-700 sm:text-xl">
                 {absent}
@@ -351,10 +442,7 @@ export default function StudentDashboard() {
             </div>
 
             <div className="rounded-xl bg-amber-50 p-2 text-center sm:p-3">
-              <Clock
-                className="mx-auto text-amber-600"
-                size={20}
-              />
+              <Clock className="mx-auto text-amber-600" size={20} />
 
               <p className="mt-2 text-lg font-bold text-amber-700 sm:text-xl">
                 {late}
@@ -466,10 +554,7 @@ export default function StudentDashboard() {
               </p>
             </div>
 
-            <ClipboardList
-              className="shrink-0 text-violet-600"
-              size={23}
-            />
+            <ClipboardList className="shrink-0 text-violet-600" size={23} />
           </div>
 
           {results.length > 0 ? (
@@ -505,10 +590,7 @@ export default function StudentDashboard() {
             </div>
           ) : (
             <div className="py-10 text-center">
-              <ClipboardList
-                className="mx-auto text-slate-300"
-                size={38}
-              />
+              <ClipboardList className="mx-auto text-slate-300" size={38} />
 
               <p className="mt-3 text-sm text-slate-500">
                 No results available yet.
@@ -537,18 +619,12 @@ export default function StudentDashboard() {
               </p>
             </div>
 
-            <BookOpen
-              className="shrink-0 text-blue-600"
-              size={23}
-            />
+            <BookOpen className="shrink-0 text-blue-600" size={23} />
           </div>
 
           {routineLoading ? (
             <div className="py-10 text-center">
-              <LoaderCircle
-                className="mx-auto animate-spin text-blue-600"
-                size={30}
-              />
+              <LoaderCircle className="mx-auto animate-spin text-blue-600" size={30} />
 
               <p className="mt-2 text-sm text-slate-500">
                 Loading routine...
@@ -589,10 +665,7 @@ export default function StudentDashboard() {
             </div>
           ) : (
             <div className="py-10 text-center">
-              <BookOpen
-                className="mx-auto text-slate-300"
-                size={38}
-              />
+              <BookOpen className="mx-auto text-slate-300" size={38} />
 
               <p className="mt-3 text-sm text-slate-500">
                 No routine available for your class yet.
@@ -663,10 +736,7 @@ export default function StudentDashboard() {
           </div>
         ) : (
           <div className="py-10 text-center">
-            <Bell
-              className="mx-auto text-slate-300"
-              size={38}
-            />
+            <Bell className="mx-auto text-slate-300" size={38} />
 
             <p className="mt-3 text-sm text-slate-500">
               There are no notices to display.
