@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from "react";
 import {
   Bell,
@@ -16,6 +15,7 @@ import {
   Megaphone,
   AlertCircle,
   CheckCircle,
+  Printer,
 } from "lucide-react";
 
 import api from "../../services/api";
@@ -138,6 +138,8 @@ export default function Notice() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [schoolInfo, setSchoolInfo] = useState(null);
+
   const [role] = useState(() => {
     const keys = [
       "user",
@@ -179,9 +181,33 @@ export default function Notice() {
     }
   }, []);
 
+  // Fetch school information for print report.
+  const fetchSchoolInfo = useCallback(async () => {
+    if (!isAdmin) return;
+
+    try {
+      const response = await api.get("/settings/school-info");
+
+      const info =
+        response.data?.data?.school ||
+        response.data?.data ||
+        response.data?.school ||
+        response.data;
+
+      setSchoolInfo(info);
+    } catch (err) {
+      console.error("School information loading failed:", err);
+      setSchoolInfo(null);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     fetchNotices();
   }, [fetchNotices]);
+
+  useEffect(() => {
+    fetchSchoolInfo();
+  }, [fetchSchoolInfo]);
 
   const filteredNotices = notices.filter((notice) => {
     const keyword = search.trim().toLowerCase();
@@ -328,6 +354,346 @@ export default function Notice() {
     }
   };
 
+  // ADMIN ONLY: Print Notice Report.
+  const handlePrint = () => {
+    if (!isAdmin) return;
+
+    if (filteredNotices.length === 0) {
+      window.alert("No notices available to print.");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=1000,height=800");
+
+    if (!printWindow) {
+      window.alert("Please allow pop-ups to print the notice report.");
+      return;
+    }
+
+    const schoolName =
+      schoolInfo?.schoolName ||
+      schoolInfo?.name ||
+      schoolInfo?.institutionName ||
+      "School Management System";
+
+    const schoolAddress =
+      schoolInfo?.address ||
+      schoolInfo?.schoolAddress ||
+      "";
+
+    const schoolPhone =
+      schoolInfo?.phone ||
+      schoolInfo?.contactNumber ||
+      schoolInfo?.phoneNumber ||
+      "";
+
+    const schoolEmail =
+      schoolInfo?.email ||
+      schoolInfo?.schoolEmail ||
+      "";
+
+    const schoolLogo =
+      schoolInfo?.logo ||
+      schoolInfo?.schoolLogo ||
+      schoolInfo?.logoUrl ||
+      "";
+
+    const contactInfo = [
+      schoolAddress,
+      schoolPhone ? `Phone: ${schoolPhone}` : "",
+      schoolEmail ? `Email: ${schoolEmail}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
+    const escapeHTML = (value) =>
+      String(value ?? "—").replace(/[&<>"']/g, (character) => {
+        const entities = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        };
+
+        return entities[character];
+      });
+
+    const noticeRows = filteredNotices
+      .map(
+        (notice, index) => `
+          <article class="notice-item">
+            <div class="notice-top">
+              <span class="notice-number">${String(index + 1).padStart(2, "0")}</span>
+              <span class="audience">${escapeHTML(getRoleLabel(notice.targetRole))}</span>
+            </div>
+
+            <h3>${escapeHTML(notice.title)}</h3>
+
+            <div class="meta">
+              <span><strong>Publish Date:</strong> ${escapeHTML(formatDate(notice.publishDate))}</span>
+              <span><strong>Created By:</strong> ${escapeHTML(notice.createdBy?.name || "School Admin")}</span>
+            </div>
+
+            <p class="description">${escapeHTML(notice.description).replace(/\n/g, "<br>")}</p>
+          </article>
+        `
+      )
+      .join("");
+
+    const filterDescription =
+      roleFilter === "all"
+        ? "All Audiences"
+        : getRoleLabel(roleFilter);
+
+    const printDate = formatDate(new Date());
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>Notice Report</title>
+
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 18mm;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+              color: #111827;
+              font-family: Arial, Helvetica, sans-serif;
+              font-size: 12px;
+              line-height: 1.6;
+            }
+
+            .school-header {
+              text-align: center;
+              padding-bottom: 15px;
+              border-bottom: 2px solid #111827;
+              margin-bottom: 22px;
+            }
+
+            .logo {
+              width: 65px;
+              height: 65px;
+              object-fit: contain;
+              margin: 0 auto 8px;
+            }
+
+            .school-name {
+              font-size: 23px;
+              font-weight: 700;
+              margin: 0 0 5px;
+              text-transform: uppercase;
+            }
+
+            .school-contact {
+              font-size: 10px;
+              color: #4b5563;
+              margin: 3px 0;
+            }
+
+            .report-title {
+              font-size: 19px;
+              font-weight: 700;
+              text-align: center;
+              margin: 22px 0 5px;
+              text-transform: uppercase;
+            }
+
+            .report-subtitle {
+              text-align: center;
+              font-size: 11px;
+              color: #4b5563;
+              margin-bottom: 18px;
+            }
+
+            .report-info {
+              display: flex;
+              justify-content: space-between;
+              gap: 12px;
+              border-bottom: 1px solid #d1d5db;
+              padding-bottom: 10px;
+              margin-bottom: 18px;
+              font-size: 11px;
+            }
+
+            .notice-item {
+              padding: 13px 0 16px;
+              border-bottom: 1px solid #d1d5db;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            .notice-top {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              margin-bottom: 7px;
+            }
+
+            .notice-number {
+              font-size: 11px;
+              font-weight: 700;
+              color: #6b7280;
+            }
+
+            .audience {
+              font-size: 10px;
+              font-weight: 700;
+              padding: 3px 9px;
+              border: 1px solid #9ca3af;
+              border-radius: 20px;
+            }
+
+            .notice-item h3 {
+              font-size: 15px;
+              margin: 4px 0 7px;
+              font-weight: 700;
+              color: #111827;
+              overflow-wrap: anywhere;
+            }
+
+            .meta {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 8px 20px;
+              color: #4b5563;
+              font-size: 10px;
+              margin-bottom: 9px;
+            }
+
+            .description {
+              font-size: 11px;
+              line-height: 1.8;
+              color: #374151;
+              white-space: normal;
+              overflow-wrap: anywhere;
+              margin: 0;
+            }
+
+            .total-count {
+              margin-top: 16px;
+              text-align: right;
+              font-size: 11px;
+              font-weight: 700;
+            }
+
+            .print-footer {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              margin-top: 65px;
+              page-break-inside: avoid;
+            }
+
+            .print-date {
+              font-size: 10px;
+              color: #6b7280;
+            }
+
+            .signature {
+              width: 190px;
+              text-align: center;
+              padding-top: 8px;
+              border-top: 1px solid #111827;
+              font-size: 11px;
+              font-weight: 600;
+            }
+
+            @media print {
+              body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+          <header class="school-header">
+            ${
+              schoolLogo
+                ? `<img class="logo" src="${escapeHTML(schoolLogo)}" alt="School Logo" />`
+                : ""
+            }
+
+            <h1 class="school-name">${escapeHTML(schoolName)}</h1>
+
+            ${
+              contactInfo
+                ? `<p class="school-contact">${escapeHTML(contactInfo)}</p>`
+                : ""
+            }
+          </header>
+
+          <h2 class="report-title">Notice Report</h2>
+
+          <p class="report-subtitle">
+            School Announcements and Notifications
+          </p>
+
+          <div class="report-info">
+            <span><strong>Audience:</strong> ${escapeHTML(filterDescription)}</span>
+            <span><strong>Search:</strong> ${escapeHTML(search.trim() || "All Notices")}</span>
+          </div>
+
+          ${noticeRows}
+
+          <p class="total-count">
+            Total Notices: ${filteredNotices.length}
+          </p>
+
+          <footer class="print-footer">
+            <div class="print-date">
+              Printed on: ${escapeHTML(printDate)}
+            </div>
+
+            <div class="signature">
+              Authorized Signature
+            </div>
+          </footer>
+
+          <script>
+            window.onload = function () {
+              const images = Array.from(document.images);
+
+              Promise.all(
+                images.map((image) => {
+                  if (image.complete) return Promise.resolve();
+
+                  return new Promise((resolve) => {
+                    image.onload = resolve;
+                    image.onerror = resolve;
+                  });
+                })
+              ).then(() => {
+                setTimeout(() => {
+                  window.print();
+                }, 300);
+              });
+            };
+
+            window.onafterprint = function () {
+              window.close();
+            };
+          <\/script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  };
+
   const totalNotices = notices.length;
 
   const everyoneCount = notices.filter(
@@ -364,7 +730,11 @@ export default function Notice() {
             </p>
           </div>
 
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <div
+            className={`grid w-full gap-2 sm:flex sm:w-auto ${
+              isAdmin ? "grid-cols-2 sm:flex-wrap" : "grid-cols-1"
+            }`}
+          >
             <button
               type="button"
               onClick={fetchNotices}
@@ -379,14 +749,26 @@ export default function Notice() {
             </button>
 
             {isAdmin && (
-              <button
-                type="button"
-                onClick={openCreateForm}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:px-5 sm:text-sm"
-              >
-                <Plus size={17} />
-                Create Notice
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  disabled={loading || filteredNotices.length === 0}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-gray-500 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:text-sm"
+                >
+                  <Printer size={16} />
+                  Print Report
+                </button>
+
+                <button
+                  type="button"
+                  onClick={openCreateForm}
+                  className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:col-span-1 sm:px-5 sm:text-sm"
+                >
+                  <Plus size={17} />
+                  Create Notice
+                </button>
+              </>
             )}
           </div>
         </div>
