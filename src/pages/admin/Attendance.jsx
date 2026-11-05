@@ -143,7 +143,7 @@ export default function AttendanceManagement() {
   const canDelete = isAdmin;
   const canPrint = isAdmin || isTeacher;
 
-  // Load classes according to user role
+
   const loadOptions = useCallback(async () => {
     if (isStudent) {
       setClasses([]);
@@ -185,7 +185,7 @@ export default function AttendanceManagement() {
     }
   }, [isAdmin, isStudent, isTeacher, filterClass]);
 
-  // Load students for selected class
+ 
   const loadClassStudents = useCallback(
     async (classId) => {
       if (!classId || !isTeacher) {
@@ -211,7 +211,6 @@ export default function AttendanceManagement() {
     [isTeacher]
   );
 
-  // Load attendance according to role
   const loadAttendance = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -239,7 +238,7 @@ export default function AttendanceManagement() {
     }
   }, [isStudent, filterClass, filterDate]);
 
-  // Load school information for Admin and Teacher
+  
   useEffect(() => {
     const loadSchoolInfo = async () => {
       try {
@@ -269,7 +268,7 @@ export default function AttendanceManagement() {
     loadAttendance();
   }, [loadAttendance]);
 
-  // Open create modal
+  
   const openCreateModal = () => {
     if (!canCreate) return;
 
@@ -281,7 +280,7 @@ export default function AttendanceManagement() {
     setModalOpen(true);
   };
 
-  // Open edit modal
+  
   const openEditModal = (record) => {
     if (!canEdit) return;
 
@@ -300,7 +299,7 @@ export default function AttendanceManagement() {
     setModalOpen(true);
   };
 
-  // Close modal
+ 
   const closeModal = () => {
     if (saving) return;
 
@@ -311,7 +310,6 @@ export default function AttendanceManagement() {
     setError("");
   };
 
-  // Handle input changes
   const handleChange = async (event) => {
     const { name, value } = event.target;
 
@@ -326,7 +324,7 @@ export default function AttendanceManagement() {
     }
   };
 
-  // Create or update attendance
+  
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -383,7 +381,6 @@ export default function AttendanceManagement() {
     }
   };
 
-  // Delete attendance
   const handleDelete = async (record) => {
     if (!canDelete || deletingId) return;
 
@@ -409,7 +406,6 @@ export default function AttendanceManagement() {
     }
   };
 
-  // Search filter
   const filteredAttendance = attendance.filter((record) => {
     const studentName =
       typeof record.student === "object"
@@ -453,7 +449,7 @@ export default function AttendanceManagement() {
     (item) => item.status === "Late"
   ).length;
 
-  // Print attendance report
+ 
   const handlePrint = () => {
     if (!canPrint) return;
 
@@ -630,7 +626,7 @@ export default function AttendanceManagement() {
                 type="button"
                 onClick={handlePrint}
                 disabled={loading || filteredAttendance.length === 0}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-gray-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 <Printer size={18} />
                 Print Report
