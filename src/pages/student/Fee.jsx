@@ -24,7 +24,15 @@ const Fee = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch Student Fee
+  // Calculate aggregate payment status
+  const getOverallStatus = (total, paid, due) => {
+    if (total <= 0) return "No Fee";
+    if (due <= 0) return "Paid";
+    if (paid > 0) return "Partial";
+    return "Due";
+  };
+
+  // Fetch Logged-in Student's Fees
   const fetchFees = async () => {
     try {
       setLoading(true);
@@ -32,14 +40,26 @@ const Fee = () => {
 
       const response = await api.get("/fee/student-fees");
 
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message || "Failed to load fee information."
+        );
+      }
+
       const feeData = response.data?.data;
 
-      // Backend returns one fee object, not an array
-      const feeRecords = feeData ? [feeData] : [];
+      // Backend returns an array of fee records
+      const feeRecords = Array.isArray(feeData)
+        ? feeData
+        : Array.isArray(feeData?.fees)
+          ? feeData.fees
+          : feeData
+            ? [feeData]
+            : [];
 
       setFees(feeRecords);
 
-      // Calculate Summary
+      // Calculate all fee records
       const totalFee = feeRecords.reduce(
         (sum, fee) => sum + Number(fee.totalFee || 0),
         0
@@ -65,6 +85,7 @@ const Fee = () => {
 
       setError(
         err.response?.data?.message ||
+          err.message ||
           "Failed to load fee information."
       );
 
@@ -93,7 +114,11 @@ const Fee = () => {
   const formatDate = (date) => {
     if (!date) return "N/A";
 
-    return new Date(date).toLocaleDateString("en-GB");
+    const parsedDate = new Date(date);
+
+    return Number.isNaN(parsedDate.getTime())
+      ? "N/A"
+      : parsedDate.toLocaleDateString("en-GB");
   };
 
   // Status Style
@@ -129,6 +154,13 @@ const Fee = () => {
         return <Receipt size={16} />;
     }
   };
+
+  // Overall Payment Status
+  const overallStatus = getOverallStatus(
+    summary.totalFee,
+    summary.paidAmount,
+    summary.dueAmount
+  );
 
   // Summary Cards
   const cards = [
@@ -167,7 +199,7 @@ const Fee = () => {
       <div className="flex min-h-[60vh] w-full items-center justify-center p-4">
         <div className="text-center">
           <RefreshCw
-            className="mx-auto text-blue-600"
+            className="mx-auto animate-spin text-blue-600"
             size={32}
           />
 
@@ -299,7 +331,7 @@ const Fee = () => {
 
             <div className="h-3 w-full overflow-hidden rounded-full bg-white/25">
               <div
-                className="h-full rounded-full bg-white"
+                className="h-full rounded-full bg-white transition-all"
                 style={{
                   width: `${paymentPercentage}%`,
                 }}
@@ -310,6 +342,27 @@ const Fee = () => {
               {formatCurrency(summary.paidAmount)} paid out of{" "}
               {formatCurrency(summary.totalFee)}
             </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-blue-100 sm:text-sm">
+                Payment Status:
+              </span>
+
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                  overallStatus === "Paid"
+                    ? "bg-green-100 text-green-700"
+                    : overallStatus === "Partial"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : overallStatus === "Due"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-white/20 text-white"
+                }`}
+              >
+                {getStatusIcon(overallStatus)}
+                {overallStatus}
+              </span>
+            </div>
           </div>
         </div>
 

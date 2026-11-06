@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -14,7 +13,6 @@ import {
   XCircle,
   AlertCircle,
   LoaderCircle,
-  Hash,
   School,
   Layers,
   CalendarDays,
@@ -195,6 +193,25 @@ export default function StudentDashboard() {
   const totalFee = Number(fees.totalFee || 0);
   const paidFee = Number(fees.paidFee || 0);
   const dueFee = Number(fees.dueFee || 0);
+
+  // Overall Payment Status
+  const overallFeeStatus =
+    totalFee <= 0
+      ? "No Fee"
+      : dueFee <= 0
+        ? "Paid"
+        : paidFee > 0
+          ? "Partial"
+          : "Due";
+
+  const feeStatusStyle =
+    overallFeeStatus === "Paid"
+      ? "bg-green-100 text-green-700"
+      : overallFeeStatus === "Partial"
+        ? "bg-yellow-100 text-yellow-700"
+        : overallFeeStatus === "Due"
+          ? "bg-red-100 text-red-700"
+          : "bg-slate-100 text-slate-600";
 
   // Dashboard Statistics
   const stats = [
@@ -525,6 +542,19 @@ export default function StudentDashboard() {
 
               <span className="break-all text-right text-sm font-bold text-red-600 sm:text-base">
                 ৳{dueFee.toLocaleString()}
+              </span>
+            </div>
+
+            {/* Payment Status */}
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <span className="text-xs font-medium text-slate-600 sm:text-sm">
+                Payment Status
+              </span>
+
+              <span
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${feeStatusStyle}`}
+              >
+                {overallFeeStatus}
               </span>
             </div>
           </div>
