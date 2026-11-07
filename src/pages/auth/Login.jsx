@@ -17,61 +17,84 @@ import { loginUser } from "../../services/authSlice";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const [isLoading, setIsLoading] = useState(false);
-
+  // Handle input changes
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+
     setErrorMessage("");
   };
 
+  // Handle login
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setErrorMessage("");
     setIsLoading(true);
 
     try {
       const result = await dispatch(loginUser(formData)).unwrap();
 
-      // Handle the API response structure
+      // Handle API response
       const data = result?.data ?? result;
       const user = data?.user;
       const token = data?.token;
 
       if (!user || !token) {
-        throw new Error("Login response is missing user information or token.");
+        throw new Error(
+          "Login response is missing user information or token."
+        );
       }
 
-      // Save login information for AppLayout
+      // Save login information
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Redirect according to the user's role
-      if (user.role === "admin") {
-        navigate("/admin/dashboard", { replace: true });
+      // Redirect according to user role
+      if (user.role === "superadmin") {
+        navigate("/super-admin/dashboard", {
+          replace: true,
+        });
+      } else if (user.role === "admin") {
+        navigate("/admin/dashboard", {
+          replace: true,
+        });
       } else if (user.role === "teacher") {
-        navigate("/teacher/dashboard", { replace: true });
+        navigate("/teacher/dashboard", {
+          replace: true,
+        });
       } else if (user.role === "student") {
-        navigate("/student/dashboard", { replace: true });
+        navigate("/student/dashboard", {
+          replace: true,
+        });
       } else {
-        setErrorMessage("Your account has an invalid role. Please contact the administrator.");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        setErrorMessage(
+          "Your account has an invalid role. Please contact the administrator."
+        );
       }
     } catch (error) {
       const message =
         typeof error === "string"
           ? error
-          : error?.message || "Login failed. Please check your email and password.";
+          : error?.message ||
+            "Login failed. Please check your email and password.";
 
       setErrorMessage(message);
     } finally {
@@ -81,7 +104,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-2">
-      {/* Left branding section */}
+      {/* Left Branding Section */}
       <section className="relative hidden overflow-hidden bg-blue-700 p-12 text-white lg:flex lg:flex-col lg:justify-between xl:p-16">
         <div className="absolute -right-24 -top-24 h-80 w-80 rounded-full bg-blue-500/30" />
         <div className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-indigo-400/20" />
@@ -90,6 +113,7 @@ export default function Login() {
           <div className="rounded-xl bg-white/15 p-3">
             <GraduationCap size={30} />
           </div>
+
           <div>
             <h1 className="text-xl font-bold">Education</h1>
             <p className="text-sm text-blue-100">
@@ -121,6 +145,7 @@ export default function Login() {
               <div className="rounded-lg bg-white/10 p-3">
                 <BookOpen size={22} />
               </div>
+
               <div>
                 <p className="font-semibold">Organized Learning</p>
                 <p className="text-sm text-blue-100">
@@ -133,6 +158,7 @@ export default function Login() {
               <div className="rounded-lg bg-white/10 p-3">
                 <Users size={22} />
               </div>
+
               <div>
                 <p className="font-semibold">Role-Based Access</p>
                 <p className="text-sm text-blue-100">
@@ -148,7 +174,7 @@ export default function Login() {
         </p>
       </section>
 
-      {/* Right login form */}
+      {/* Right Login Form */}
       <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
         <div className="w-full max-w-md">
           <Link
@@ -156,6 +182,7 @@ export default function Login() {
             className="mb-10 flex items-center justify-center gap-2 lg:hidden"
           >
             <GraduationCap className="text-blue-600" size={32} />
+
             <span className="text-xl font-bold text-gray-900">
               Education
             </span>
@@ -176,6 +203,7 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email */}
             <div>
               <label
                 htmlFor="email"
@@ -189,6 +217,7 @@ export default function Login() {
                   size={19}
                   className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
                 />
+
                 <input
                   id="email"
                   name="email"
@@ -203,6 +232,7 @@ export default function Login() {
               </div>
             </div>
 
+            {/* Password */}
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <label
@@ -225,6 +255,7 @@ export default function Login() {
                   size={19}
                   className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"
                 />
+
                 <input
                   id="password"
                   name="password"
@@ -240,15 +271,21 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={
+                    showPassword ? "Hide password" : "Show password"
+                  }
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
                 >
-                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                  {showPassword ? (
+                    <EyeOff size={19} />
+                  ) : (
+                    <Eye size={19} />
+                  )}
                 </button>
               </div>
             </div>
 
-            {/* Login error */}
+            {/* Login Error */}
             {errorMessage && (
               <div
                 role="alert"
@@ -258,12 +295,14 @@ export default function Login() {
               </div>
             )}
 
+            {/* Login Button */}
             <button
               type="submit"
               disabled={isLoading}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? "Signing in..." : "Sign In"}
+
               {!isLoading && <ArrowRight size={18} />}
             </button>
           </form>

@@ -3,14 +3,17 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "./pages/auth/Login";
 import HomeRedirect from "./pages/HomeRedirect";
-import AppLayout from "./components/AppLayout";;
+import AppLayout from "./components/AppLayout";
 import NotFound from "./pages/NotFound";
 import Register from "./pages/auth/Registration";
 
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import StudentDashboard from "./pages/student/StudentDashboard";
-import ProtectedRoute from "./components/ProtectRoute";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
+
+
+import ProtectedRoute from "./components/ProtectRoute";
+
 import Teachers from "./pages/admin/Teachers";
 import Students from "./pages/admin/Student";
 import ClassManagement from "./pages/admin/Class";
@@ -23,12 +26,12 @@ import Routine from "./pages/admin/Routine";
 import Notice from "./pages/admin/Notice";
 import SettingsManagement from "./pages/admin/Setting";
 
-
 import Attendance from "./pages/student/Attendance";
 import Result from "./pages/student/Result";
 import Fee from "./pages/student/Fee";
 import RoutineManagement from "./pages/student/Routine";
 import NoticeManagement from "./pages/student/Notice";
+
 import StudentManagement from "./pages/teacher/Student";
 import Class from "./pages/teacher/Class";
 import Subject from "./pages/teacher/Subject";
@@ -36,21 +39,33 @@ import PresentManagement from "./pages/teacher/Attendance";
 import ResultsManagement from "./pages/teacher/Result";
 import RoutineSystem from "./pages/teacher/Routine";
 import NoticeList from "./pages/teacher/Notice";
+
 import Profile from "./pages/admin/Profile";
 import TeacherProfile from "./pages/teacher/Profile";
 import StudentProfile from "./pages/student/Profile";
-
+import SuperAdminDashboard from "./pages/superAdmin/superAdminDashboard";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
+        {/* Public Routes */}
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
-        {/* Admin routes */}
+        {/* Super Admin Routes */}
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["superadmin"]} />
+          }
+        >
+          <Route
+            path="/super-admin/dashboard" element={<SuperAdminDashboard />}
+          />
+        </Route>
+
+        {/* Admin Routes */}
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route element={<AppLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -69,10 +84,10 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* Student routes */}
+        {/* Student Routes */}
         <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
           <Route element={<AppLayout />}>
-            <Route path="/student/dashboard" element={<StudentDashboard />}/>
+            <Route path="/student/dashboard" element={<StudentDashboard />} />
             <Route path="/student/attendance" element={<Attendance />} />
             <Route path="/student/results" element={<Result />} />
             <Route path="/student/fees" element={<Fee />} />
@@ -82,11 +97,10 @@ export default function App() {
           </Route>
         </Route>
 
-         {/* Teacher routes */}
-
-         <Route element={<ProtectedRoute allowedRoles={["teacher"]} />}>
+        {/* Teacher Routes */}
+        <Route element={<ProtectedRoute allowedRoles={["teacher"]} />}>
           <Route element={<AppLayout />}>
-            <Route path="/teacher/dashboard" element={<TeacherDashboard />}/>
+            <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
             <Route path="/teacher/students" element={<StudentManagement />} />
             <Route path="/teacher/classes" element={<Class />} />
             <Route path="/teacher/subjects" element={<Subject />} />
@@ -98,7 +112,7 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* Not found */}
+        {/* Not Found */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

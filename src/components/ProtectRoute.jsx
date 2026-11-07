@@ -1,7 +1,7 @@
 
 import { Navigate, Outlet } from "react-router-dom";
 
-export default function ProtectedRoute({ allowedRoles }) {
+export default function ProtectedRoute({ allowedRoles = [] }) {
   const token = localStorage.getItem("token");
 
   let user = null;
@@ -19,19 +19,24 @@ export default function ProtectedRoute({ allowedRoles }) {
 
   // Role onujayi dashboard access control
   if (!allowedRoles.includes(user.role)) {
-    if (user.role === "admin") {
-      return <Navigate to="/admin/dashboard" replace />;
-    }
+    switch (user.role) {
+      case "superadmin":
+        return <Navigate to="/super-admin/dashboard" replace />;
 
-    if (user.role === "teacher") {
-      return <Navigate to="/teacher/dashboard" replace />;
-    }
+      case "admin":
+        return <Navigate to="/admin/dashboard" replace />;
 
-    if (user.role === "student") {
-      return <Navigate to="/student/dashboard" replace />;
-    }
+      case "teacher":
+        return <Navigate to="/teacher/dashboard" replace />;
 
-    return <Navigate to="/login" replace />;
+      case "student":
+        return <Navigate to="/student/dashboard" replace />;
+
+      default:
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        return <Navigate to="/login" replace />;
+    }
   }
 
   return <Outlet />;
